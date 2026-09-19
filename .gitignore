@@ -1,0 +1,27 @@
+# Private company data
+03_Raw_Data/*
+04_Cleaned_Data/*
+02_Company_Information/*
+
+# Keep folder placeholders
+!03_Raw_Data/.gitkeep
+!04_Cleaned_Data/.gitkeep
+!02_Company_Information/.gitkeep
+
+# Excel temporary files
+~$*.xlsx
+~$*.xls
+~$*.docx
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+Thumbs.db
