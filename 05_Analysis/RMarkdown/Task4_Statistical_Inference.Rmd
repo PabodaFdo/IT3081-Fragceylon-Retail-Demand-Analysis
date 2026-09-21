@@ -1,0 +1,452 @@
+---
+title: "Task 4 - Statistical Inference"
+author: "IT3081 Statistical Modelling"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: true
+    df_print: paged
+  html_notebook:
+    toc: true
+    toc_float: true
+    number_sections: true
+    code_folding: show
+subtitle: Retail Product Demand Analysis at Fragceylon
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 9,
+  fig.height = 6,
+  fig.align = "center"
+)
+
+options(scipen = 999)
+
+project_root = "C:/Users/saths/Desktop/Sliit/3rd year/3rd Year 1st sem/IT3081-SM/Project/IT3081-Fragceylon-Retail-Demand-Analysis"
+knitr::opts_knit$set(root.dir = project_root)
+
+library(readxl)
+library(knitr)
+library(car)
+```
+
+# 1. Purpose of Task 4
+
+Task 4 uses statistical inference to determine whether selected differences observed in the descriptive analysis are large enough to be statistically distinguishable from random sample variation.
+
+For all main tests:
+
+\[
+\alpha = 0.05
+\]
+
+The response variable is **Regular Order Quantity**.
+
+# 2. Load the Analytical Dataset
+
+```{r load-data}
+regular_file = "04_Cleaned_Data/Fragceylon_Regular_Orders.xlsx"
+
+regular_orders = read_excel(regular_file)
+regular_orders$Date = as.Date(regular_orders$Date)
+
+dim(regular_orders)
+summary(regular_orders$Quantity)
+```
+
+# 3. Test 1 - Do Mean Order Quantities Differ by Product?
+
+## 3.1 Business question
+
+Do the four perfumes have different average Regular Order quantities?
+
+## 3.2 Why this test?
+
+The response variable, Quantity, is numerical and Product Name contains four independent categories. A one-way ANOVA is therefore appropriate for comparing the group means.
+
+## 3.3 Hypotheses
+
+**H0:** Mean Regular Order Quantity is equal across all four products.
+
+**H1:** At least one product has a different mean Regular Order Quantity.
+
+## 3.4 Group summaries
+
+```{r product-summary}
+product_group_summary = aggregate(
+  Quantity ~ `Product Name`,
+  data = regular_orders,
+  FUN = function(x) c(
+    N = length(x),
+    Mean = mean(x),
+    SD = sd(x)
+  )
+)
+
+product_group_summary
+```
+
+## 3.5 ANOVA
+
+```{r product-anova}
+regular_orders$`Product Name` = factor(
+  regular_orders$`Product Name`
+)
+
+product_anova = aov(
+  Quantity ~ `Product Name`,
+  data = regular_orders
+)
+
+summary(product_anova)
+```
+
+## 3.6 Effect size
+
+```{r product-eta}
+anova_table = summary(product_anova)[[1]]
+
+ss_between = anova_table["`Product Name`", "Sum Sq"]
+ss_total = sum(anova_table[, "Sum Sq"])
+
+eta_squared = ss_between / ss_total
+eta_squared
+```
+
+## 3.7 Result and interpretation
+
+The project result is approximately:
+
+- **F(3, 3112) = 0.3821**
+- **p = 0.7659**
+- **eta-squared ≈ 0.00037**
+
+Because p > 0.05, we **fail to reject H0**. There is no statistically significant evidence that mean transaction-level Regular Order Quantity differs among the four perfumes.
+
+The extremely small effect size also indicates that Product Name explains very little of the overall transaction-level Quantity variation.
+
+# 4. Test 2 - Do Product Quantity Variances Differ?
+
+## 4.1 Business question
+
+Even if average order sizes are similar, do some products have more variable order quantities than others?
+
+## 4.2 Why Brown-Forsythe?
+
+The Brown-Forsythe version of Levene's test is robust to non-normality because it uses the group median as the centre.
+
+## 4.3 Hypotheses
+
+**H0:** Quantity variance is equal across all four products.
+
+**H1:** At least one product has a different Quantity variance.
+
+```{r product-bf}
+product_bf = leveneTest(
+  Quantity ~ `Product Name`,
+  data = regular_orders,
+  center = median
+)
+
+product_bf
+```
+
+## 4.4 Result and interpretation
+
+The project result is approximately:
+
+- **F = 0.1349**
+- **p = 0.9393**
+
+Because p > 0.05, we **fail to reject H0**. The data do not provide evidence that Quantity variability differs by product.
+
+# 5. Test 3 - Controlled Local vs Japan Mean Quantity
+
+## 5.1 Business question
+
+Within a more comparable operating context, are Japan-labelled transactions associated with different average order quantities than Local transactions?
+
+## 5.2 Why restrict the data?
+
+Japan records occur only after 1 April 2025, within the Main Dealer structure, and are concentrated in one buyer. To reduce structural confounding, the comparison is restricted to:
+
+- Main Dealer
+- Post-April-2025 regime
+- Buyer = Prabath Liyanarachchi
+
+This still does **not** establish causality. It is a controlled observational comparison.
+
+## 5.3 Why Welch's t-test?
+
+The response is numerical and the comparison contains two independent groups. Welch's t-test is preferred because it does not require equal population variances.
+
+## 5.4 Hypotheses
+
+**H0:** Mean Quantity is equal between Japan and Local transactions.
+
+**H1:** Mean Quantity differs between Japan and Local transactions.
+
+```{r market-subset}
+market_df = regular_orders[
+  regular_orders$Buyer == "Prabath Liyanarachchi" &
+  regular_orders$`Channel Type` == "Main Dealer" &
+  regular_orders$Sales_Regime == "Post-April-2025",
+]
+
+table(market_df$`Export Market`)
+
+aggregate(
+  Quantity ~ `Export Market`,
+  data = market_df,
+  FUN = mean
+)
+```
+
+```{r market-welch}
+market_test = t.test(
+  Quantity ~ `Export Market`,
+  data = market_df,
+  var.equal = FALSE,
+  conf.level = 0.95
+)
+
+market_test
+```
+
+## 5.5 Effect size - Hedges' g
+
+```{r market-effect}
+japan = market_df$Quantity[
+  market_df$`Export Market` == "Japan"
+]
+
+local = market_df$Quantity[
+  market_df$`Export Market` == "Local"
+]
+
+n1 = length(japan)
+n2 = length(local)
+
+sp = sqrt(
+  ((n1 - 1) * var(japan) + (n2 - 1) * var(local)) /
+  (n1 + n2 - 2)
+)
+
+cohen_d = (mean(japan) - mean(local)) / sp
+
+J = 1 - 3 / (4 * (n1 + n2) - 9)
+hedges_g = J * cohen_d
+
+hedges_g
+```
+
+## 5.6 Result and interpretation
+
+The project result is approximately:
+
+- Japan mean = **622.53**
+- Local mean = **283.70**
+- Difference = **338.83**
+- **t(308.82) = 18.0612**
+- **p < 0.001**
+- 95% CI for the mean difference ≈ **301.91 to 375.74**
+- Hedges' g ≈ **1.8845**
+
+We **reject H0**. Japan-labelled transactions in this controlled subset have substantially larger average transaction Quantity than Local transactions.
+
+**Important:** This is an association. The Japan indicator is highly concentrated in one buyer and a particular business structure, so the result must not be described as a causal effect of export market.
+
+# 6. Test 4 - Pre-April Shop vs Small Dealer Mean Quantity
+
+## 6.1 Business question
+
+Before the April 2025 structural change, did Shop and Small Dealer transactions differ in average order size?
+
+## 6.2 Why restrict to the pre-April period?
+
+After 1 April 2025, the dataset contains only Main Dealer transactions. Restricting this comparison to the earlier regime avoids mixing fundamentally different channel structures.
+
+## 6.3 Why Welch's t-test?
+
+There are two independent channel groups with numerical Quantity, and equal variance is not assumed.
+
+## 6.4 Hypotheses
+
+**H0:** Mean Quantity is equal for Shop and Small Dealer transactions.
+
+**H1:** Mean Quantity differs between Shop and Small Dealer transactions.
+
+```{r channel-subset}
+channel_df = regular_orders[
+  regular_orders$Sales_Regime == "Pre-April-2025" &
+  regular_orders$`Channel Type` %in% c("Shop", "Small Dealer"),
+]
+
+table(channel_df$`Channel Type`)
+
+aggregate(
+  Quantity ~ `Channel Type`,
+  data = channel_df,
+  FUN = mean
+)
+```
+
+```{r channel-welch}
+channel_test = t.test(
+  Quantity ~ `Channel Type`,
+  data = channel_df,
+  var.equal = FALSE,
+  conf.level = 0.95
+)
+
+channel_test
+```
+
+## 6.5 Result and interpretation
+
+The project result is approximately:
+
+- Small Dealer mean = **173.12**
+- Shop mean = **29.89**
+- Difference = **143.23**
+- **t(351.14) = 37.0431**
+- **p < 0.001**
+- 95% CI ≈ **135.63 to 150.83**
+- Hedges' g ≈ **3.4927**
+
+We **reject H0**. During the pre-April-2025 regime, Small Dealer transactions had much larger average Quantity than Shop transactions.
+
+# 7. Test 5 - Does Post-April Quantity Differ by Calendar Month?
+
+## 7.1 Business question
+
+Within the current Main Dealer regime, is there evidence of systematic differences in mean transaction Quantity across calendar months?
+
+## 7.2 Why Welch one-way ANOVA?
+
+There are more than two calendar-month groups and the response is numerical. Welch's one-way ANOVA is used because it does not require equal group variances.
+
+## 7.3 Hypotheses
+
+**H0:** Mean Quantity is equal across represented calendar months.
+
+**H1:** At least one calendar month has a different mean Quantity.
+
+```{r post-month-data}
+post_df = regular_orders[
+  regular_orders$Sales_Regime == "Post-April-2025",
+]
+
+post_df$Month = factor(
+  post_df$Month,
+  levels = month.name
+)
+
+table(post_df$Month)
+```
+
+```{r month-welch-anova}
+month_test = oneway.test(
+  Quantity ~ Month,
+  data = post_df,
+  var.equal = FALSE
+)
+
+month_test
+```
+
+## 7.4 Result and interpretation
+
+The project result is approximately:
+
+- **F(11, 173.55) = 1.1124**
+- **p = 0.3542**
+
+Because p > 0.05, we **fail to reject H0**. There is no statistically significant evidence that average transaction Quantity differs across calendar months in the post-April Main Dealer regime.
+
+# 8. Supporting Robustness Checks
+
+Robustness checks are useful because a statistical conclusion should not depend entirely on one narrow modelling choice.
+
+## 8.1 Product ANOVA after removing IQR high outliers
+
+```{r robustness-product-outliers}
+product_no_outliers = regular_orders[
+  regular_orders$Outlier_IQR_Flag != "Yes",
+]
+
+summary(
+  aov(
+    Quantity ~ `Product Name`,
+    data = product_no_outliers
+  )
+)
+```
+
+## 8.2 Product ANOVA within the post-April regime
+
+```{r robustness-product-post}
+summary(
+  aov(
+    Quantity ~ `Product Name`,
+    data = post_df
+  )
+)
+```
+
+## 8.3 Local vs Japan after excluding IQR high outliers
+
+```{r robustness-market-outliers}
+market_no_outliers = market_df[
+  market_df$Outlier_IQR_Flag != "Yes",
+]
+
+t.test(
+  Quantity ~ `Export Market`,
+  data = market_no_outliers,
+  var.equal = FALSE
+)
+```
+
+# 9. Final Statistical Inference Summary
+
+```{r inference-summary}
+inference_summary = data.frame(
+  Test = c(
+    "Product mean Quantity - One-Way ANOVA",
+    "Product variance - Brown-Forsythe",
+    "Controlled Local vs Japan - Welch t-test",
+    "Pre-April Shop vs Small Dealer - Welch t-test",
+    "Post-April calendar month - Welch ANOVA"
+  ),
+  Approx_p_value = c(
+    0.7659,
+    0.9393,
+    "<0.001",
+    "<0.001",
+    0.3542
+  ),
+  Decision = c(
+    "Fail to reject H0",
+    "Fail to reject H0",
+    "Reject H0",
+    "Reject H0",
+    "Fail to reject H0"
+  )
+)
+
+kable(
+  inference_summary,
+  caption = "Task 4 Main Inferential Findings"
+)
+```
+
+# 10. Task 4 Main Conclusion
+
+The strongest inferential differences are associated with **transaction structure** rather than Product Name or calendar month. Product means and product variances are statistically similar, while substantial differences appear between Local and Japan-labelled transactions in the controlled subset and between Shop and Small Dealer transactions in the pre-April regime.
+
+These findings are based on historical observational data. They identify associations, not causal effects.

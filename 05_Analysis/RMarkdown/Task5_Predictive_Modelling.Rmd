@@ -1,0 +1,1257 @@
+---
+title: "Task 5 - Predictive Modelling"
+author: "IT3081 Statistical Modelling"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: true
+    df_print: paged
+  html_notebook:
+    toc: true
+    toc_float: true
+    number_sections: true
+    code_folding: show
+subtitle: Retail Product Demand Analysis at Fragceylon
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 9,
+  fig.height = 6,
+  fig.align = "center"
+)
+
+options(scipen = 999)
+
+project_root = "C:/Users/saths/Desktop/Sliit/3rd year/3rd Year 1st sem/IT3081-SM/Project/IT3081-Fragceylon-Retail-Demand-Analysis"
+knitr::opts_knit$set(root.dir = project_root)
+
+library(readxl)
+library(knitr)
+library(car)
+library(lmtest)
+library(sandwich)
+library(MASS)
+library(glmnet)
+```
+
+# 1. Predictive Objective
+
+Task 5 develops and compares models that predict **transaction-level Regular Order Quantity**.
+
+The main modelling question is:
+
+> Given information available about a transaction, how accurately can we predict the quantity ordered?
+
+The analysis compares:
+
+- Training-mean baseline
+- Multiple Linear Regression (MLR)
+- Poisson GLM
+- Negative Binomial GLM
+- Ridge Regression
+- LASSO Regression
+- Elastic Net Regression
+
+# 2. Load Regular Orders
+
+```{r load-data}
+regular_file = "04_Cleaned_Data/Fragceylon_Regular_Orders.xlsx"
+
+df = read_excel(regular_file)
+df$Date = as.Date(df$Date)
+
+dim(df)
+summary(df$Quantity)
+```
+
+# 3. Modelling Population
+
+## 3.1 Why use the current regime only?
+
+The business structure changes on 1 April 2025. Before that date, Shop and Small Dealer transactions exist; after that date, the data contain only Main Dealer transactions.
+
+Using the current regime avoids training a forecasting model across incompatible channel structures.
+
+```{r current-regime}
+current_df = df[
+  df$Date >= as.Date("2025-04-01"),
+]
+
+current_df = current_df[
+  order(current_df$Date, current_df$`Order ID`),
+]
+
+rownames(current_df) = NULL
+
+cat("Current-regime rows:", nrow(current_df), "\n")
+cat("Start:", format(min(current_df$Date)), "\n")
+cat("End:", format(max(current_df$Date)), "\n")
+
+table(current_df$`Channel Type`)
+table(current_df$Sales_Regime)
+```
+
+**Expected result:** 2,014 Regular Orders in the current regime.
+
+# 4. Predictor Selection and Exclusions
+
+## 4.1 Candidate predictors
+
+Candidate predictors considered include:
+
+- Product Name
+- Export Market
+- Month
+- Day of Week
+- Time Trend
+
+## 4.2 Why some variables are excluded
+
+**Order ID** is an identifier, not a meaningful demand driver.
+
+**Total Value (LKR)** is excluded because it is calculated from Quantity and Unit Price. Using it would create direct target leakage.
+
+**Unit Price (LKR)** is excluded from the primary model because its values are structurally determined by the business pricing setup and are closely related to channel/quantity conditions.
+
+**Buyer** is not used in the primary model because the buyer variable is high-cardinality and Japan transactions are concentrated in one buyer, which would make interpretation unstable.
+
+**Channel Type** and **Sales Regime** are constant within the current-regime modelling population, so they cannot explain within-regime variation.
+
+**Outlier_IQR_Flag** is not used because it is derived from the response variable itself.
+
+# 5. Chronological Train-Test Split
+
+## 5.1 Why not use a random split?
+
+The goal is to predict future demand. A chronological split is more realistic because the model is trained on earlier observations and evaluated on later unseen observations.
+
+```{r split}
+TEST_START_DATE = as.Date("2026-04-01")
+
+train_df = current_df[
+  current_df$Date < TEST_START_DATE,
+]
+
+test_df = current_df[
+  current_df$Date >= TEST_START_DATE,
+]
+
+train_df = train_df[
+  order(train_df$Date, train_df$`Order ID`),
+]
+
+test_df = test_df[
+  order(test_df$Date, test_df$`Order ID`),
+]
+
+rownames(train_df) = NULL
+rownames(test_df) = NULL
+
+cat("Training rows:", nrow(train_df), "\n")
+cat(
+  "Training period:",
+  format(min(train_df$Date)),
+  "to",
+  format(max(train_df$Date)),
+  "\n"
+)
+
+cat("Testing rows:", nrow(test_df), "\n")
+cat(
+  "Testing period:",
+  format(min(test_df$Date)),
+  "to",
+  format(max(test_df$Date)),
+  "\n"
+)
+```
+
+**Expected result:**
+
+- Training = 1,599 observations
+- Testing = 415 observations
+
+# 6. Evaluation Metrics
+
+Three main predictive metrics are used:
+
+**MAE - Mean Absolute Error:** Average absolute prediction error.
+
+**RMSE - Root Mean Squared Error:** Gives greater penalty to large errors.
+
+**R-squared:** Proportion of variation explained relative to the test-set mean benchmark.
+
+```{r metrics-function}
+regression_metrics = function(actual, predicted) {
+  mae = mean(abs(actual - predicted))
+  rmse = sqrt(mean((actual - predicted)^2))
+  r2 = 1 -
+    sum((actual - predicted)^2) /
+    sum((actual - mean(actual))^2)
+
+  return(
+    c(
+      MAE = mae,
+      RMSE = rmse,
+      R2 = r2
+    )
+  )
+}
+```
+
+# 7. Baseline Model
+
+## 7.1 Why a baseline?
+
+A predictive model should outperform a simple naive strategy. The baseline predicts every future order using the **mean training Quantity**.
+
+```{r baseline}
+baseline_value = mean(train_df$Quantity)
+
+baseline_train_pred = rep(
+  baseline_value,
+  nrow(train_df)
+)
+
+baseline_test_pred = rep(
+  baseline_value,
+  nrow(test_df)
+)
+
+baseline_train_metrics = regression_metrics(
+  train_df$Quantity,
+  baseline_train_pred
+)
+
+baseline_test_metrics = regression_metrics(
+  test_df$Quantity,
+  baseline_test_pred
+)
+
+baseline_train_metrics
+baseline_test_metrics
+```
+
+**Project test result:**
+
+- MAE ≈ 137.06
+- RMSE ≈ 178.34
+- R-squared ≈ -0.005
+
+This is the benchmark that the statistical models should improve on.
+
+# 8. Task 5A - Multiple Linear Regression
+
+## 8.1 Why MLR?
+
+MLR provides a simple and interpretable baseline statistical model for a numerical response. It can estimate the expected change in Quantity associated with categorical and numerical predictors while holding the others fixed.
+
+## 8.2 Prepare factors
+
+```{r factors}
+product_levels = c(
+  "Dark Matrix",
+  "Kennedy",
+  "Mesmerose",
+  "Secret Ambrosia"
+)
+
+market_levels = c(
+  "Local",
+  "Japan"
+)
+
+month_levels = c(
+  "April",
+  "August",
+  "December",
+  "February",
+  "January",
+  "July",
+  "June",
+  "March",
+  "May",
+  "November",
+  "October",
+  "September"
+)
+
+day_levels = c(
+  "Monday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+  "Thursday",
+  "Tuesday",
+  "Wednesday"
+)
+
+train_df$`Product Name` = factor(
+  train_df$`Product Name`,
+  levels = product_levels
+)
+
+test_df$`Product Name` = factor(
+  test_df$`Product Name`,
+  levels = product_levels
+)
+
+train_df$`Export Market` = factor(
+  train_df$`Export Market`,
+  levels = market_levels
+)
+
+test_df$`Export Market` = factor(
+  test_df$`Export Market`,
+  levels = market_levels
+)
+
+train_df$Month = factor(
+  train_df$Month,
+  levels = month_levels
+)
+
+test_df$Month = factor(
+  test_df$Month,
+  levels = month_levels
+)
+
+train_df$Day_of_Week = factor(
+  train_df$Day_of_Week,
+  levels = day_levels
+)
+
+test_df$Day_of_Week = factor(
+  test_df$Day_of_Week,
+  levels = day_levels
+)
+```
+
+## 8.3 Initial full MLR
+
+```{r full-mlr}
+trend_center = mean(train_df$Time_Trend)
+
+train_df$Centered_Time_Trend =
+  train_df$Time_Trend - trend_center
+
+test_df$Centered_Time_Trend =
+  test_df$Time_Trend - trend_center
+
+full_mlr = lm(
+  Quantity ~
+    `Product Name` +
+    `Export Market` +
+    Month +
+    Day_of_Week +
+    Centered_Time_Trend,
+  data = train_df
+)
+
+summary(full_mlr)
+```
+
+## 8.4 Why reduce the MLR?
+
+The initial model contains month indicators and a time trend that are strongly correlated in this limited training period. This creates high multicollinearity and makes the coefficients unstable.
+
+A simpler model is evaluated using chronological validation.
+
+## 8.5 Final reduced MLR
+
+The selected reduced specification is:
+
+\[
+Quantity \sim Product + ExportMarket + DayOfWeek
+\]
+
+```{r reduced-mlr}
+reduced_mlr = lm(
+  Quantity ~
+    `Product Name` +
+    `Export Market` +
+    Day_of_Week,
+  data = train_df
+)
+
+summary(reduced_mlr)
+```
+
+## 8.6 VIF check
+
+```{r vif}
+vif(reduced_mlr)
+```
+
+**Interpretation:** The reduced model has low multicollinearity compared with the initial specification.
+
+## 8.7 HC3 robust inference
+
+Residual heteroscedasticity remains present. HC3 robust standard errors are therefore used for coefficient inference.
+
+```{r hc3}
+coeftest(
+  reduced_mlr,
+  vcov = vcovHC(
+    reduced_mlr,
+    type = "HC3"
+  )
+)
+```
+
+## 8.8 MLR diagnostic tests
+
+```{r mlr-diagnostics}
+bptest(reduced_mlr)
+dwtest(reduced_mlr)
+
+par(mfrow = c(1, 2))
+
+plot(
+  fitted(reduced_mlr),
+  residuals(reduced_mlr),
+  main = "Residuals vs Fitted",
+  xlab = "Fitted Quantity",
+  ylab = "Residuals"
+)
+
+abline(h = 0, lty = 2)
+
+qqnorm(
+  residuals(reduced_mlr),
+  main = "Normal Q-Q Plot"
+)
+
+qqline(
+  residuals(reduced_mlr)
+)
+
+par(mfrow = c(1, 1))
+```
+
+**Interpretation:** Heteroscedasticity is present, so ordinary coefficient standard errors are not relied upon. HC3 robust standard errors are used for inference. Predictive evaluation is still performed on the unseen future holdout set.
+
+## 8.9 MLR holdout performance
+
+```{r mlr-performance}
+mlr_train_pred = predict(
+  reduced_mlr,
+  newdata = train_df
+)
+
+mlr_test_pred = predict(
+  reduced_mlr,
+  newdata = test_df
+)
+
+mlr_train_metrics = regression_metrics(
+  train_df$Quantity,
+  mlr_train_pred
+)
+
+mlr_test_metrics = regression_metrics(
+  test_df$Quantity,
+  mlr_test_pred
+)
+
+mlr_train_metrics
+mlr_test_metrics
+```
+
+**Project test result:**
+
+- MAE ≈ **116.84**
+- RMSE ≈ **137.95**
+- R-squared ≈ **0.3987**
+
+The reduced MLR clearly improves on the training-mean baseline.
+
+# 9. Task 5B - Poisson GLM
+
+## 9.1 Why test Poisson regression?
+
+Quantity is a positive integer-like response, so Poisson regression is a natural count-model candidate. However, Poisson regression assumes that conditional variance is approximately equal to conditional mean.
+
+```{r poisson}
+poisson_model = glm(
+  Quantity ~
+    `Product Name` +
+    `Export Market` +
+    Day_of_Week,
+  data = train_df,
+  family = poisson(link = "log")
+)
+
+summary(poisson_model)
+```
+
+## 9.2 Poisson holdout performance
+
+```{r poisson-performance}
+poisson_train_pred = predict(
+  poisson_model,
+  newdata = train_df,
+  type = "response"
+)
+
+poisson_test_pred = predict(
+  poisson_model,
+  newdata = test_df,
+  type = "response"
+)
+
+poisson_train_metrics = regression_metrics(
+  train_df$Quantity,
+  poisson_train_pred
+)
+
+poisson_test_metrics = regression_metrics(
+  test_df$Quantity,
+  poisson_test_pred
+)
+
+poisson_test_metrics
+```
+
+## 9.3 Overdispersion check
+
+```{r poisson-overdispersion}
+poisson_pearson_chi2 = sum(
+  residuals(
+    poisson_model,
+    type = "pearson"
+  )^2
+)
+
+poisson_dispersion =
+  poisson_pearson_chi2 /
+  df.residual(poisson_model)
+
+poisson_deviance_ratio =
+  deviance(poisson_model) /
+  df.residual(poisson_model)
+
+cat(
+  "Pearson dispersion ratio:",
+  poisson_dispersion,
+  "\n"
+)
+
+cat(
+  "Residual deviance / df:",
+  poisson_deviance_ratio,
+  "\n"
+)
+```
+
+**Project result:** Pearson dispersion ratio ≈ **63.86**.
+
+This is extreme overdispersion. Therefore the ordinary Poisson mean-variance assumption is not adequate and Poisson standard errors would be misleadingly small.
+
+# 10. Negative Binomial GLM
+
+## 10.1 Why Negative Binomial?
+
+Negative Binomial regression extends the Poisson model by allowing variance to exceed the mean. It is therefore more suitable for overdispersed count-like responses.
+
+```{r negative-binomial}
+nb_model = glm.nb(
+  Quantity ~
+    `Product Name` +
+    `Export Market` +
+    Day_of_Week,
+  data = train_df,
+  link = log,
+  control = glm.control(maxit = 100)
+)
+
+summary(nb_model)
+```
+
+## 10.2 Negative Binomial holdout performance
+
+```{r nb-performance}
+nb_train_pred = predict(
+  nb_model,
+  newdata = train_df,
+  type = "response"
+)
+
+nb_test_pred = predict(
+  nb_model,
+  newdata = test_df,
+  type = "response"
+)
+
+nb_train_metrics = regression_metrics(
+  train_df$Quantity,
+  nb_train_pred
+)
+
+nb_test_metrics = regression_metrics(
+  test_df$Quantity,
+  nb_test_pred
+)
+
+cat("Theta:", nb_model$theta, "\n")
+nb_test_metrics
+```
+
+**Project result:**
+
+- Theta ≈ **3.7408**
+- Test MAE ≈ **116.98**
+- Test RMSE ≈ **138.27**
+- Test R-squared ≈ **0.3959**
+
+The Negative Binomial model handles the distributional overdispersion better than Poisson and achieves predictive performance very close to MLR.
+
+# 11. Regularized Regression Setup
+
+## 11.1 Why Ridge, LASSO and Elastic Net?
+
+Regularization can improve stability when many encoded predictors are correlated.
+
+- **Ridge** shrinks coefficients but normally keeps all predictors.
+- **LASSO** can shrink weak coefficients exactly to zero.
+- **Elastic Net** combines Ridge and LASSO penalties.
+
+A broader predictor set is used:
+
+- Product Name
+- Export Market
+- Month
+- Day of Week
+- Time Trend
+
+```{r model-matrix}
+regularized_formula =
+  ~ `Product Name` +
+    `Export Market` +
+    Month +
+    Day_of_Week +
+    Time_Trend
+
+x_train = model.matrix(
+  regularized_formula,
+  data = train_df
+)
+
+x_test = model.matrix(
+  regularized_formula,
+  data = test_df
+)
+
+x_train = x_train[
+  ,
+  colnames(x_train) != "(Intercept)",
+  drop = FALSE
+]
+
+x_test = x_test[
+  ,
+  colnames(x_test) != "(Intercept)",
+  drop = FALSE
+]
+
+y_train = train_df$Quantity
+y_test = test_df$Quantity
+
+dim(x_train)
+dim(x_test)
+```
+
+# 12. Chronological Validation for Regularized Models
+
+## 12.1 Why chronological validation?
+
+Hyperparameters should be selected using training data only. Expanding-window validation preserves time order and avoids using future observations to tune the model.
+
+```{r folds}
+validation_folds = data.frame(
+  Fold = 1:5,
+  Train_Start = as.Date(
+    rep("2025-04-01", 5)
+  ),
+  Train_End = as.Date(
+    c(
+      "2025-05-31",
+      "2025-09-09",
+      "2025-11-12",
+      "2025-12-25",
+      "2026-02-12"
+    )
+  ),
+  Validation_Start = as.Date(
+    c(
+      "2025-06-02",
+      "2025-09-10",
+      "2025-11-13",
+      "2025-12-26",
+      "2026-02-13"
+    )
+  ),
+  Validation_End = as.Date(
+    c(
+      "2025-09-09",
+      "2025-11-12",
+      "2025-12-25",
+      "2026-02-12",
+      "2026-03-31"
+    )
+  )
+)
+
+validation_folds
+```
+
+```{r glmnet-cv-function}
+chronological_glmnet_cv = function(
+  alpha_value,
+  train_data,
+  x_matrix,
+  y_vector,
+  fold_table,
+  lambda_grid
+) {
+
+  all_results = data.frame()
+
+  for(i in 1:nrow(fold_table)) {
+
+    fold_train_index =
+      train_data$Date >= fold_table$Train_Start[i] &
+      train_data$Date <= fold_table$Train_End[i]
+
+    fold_valid_index =
+      train_data$Date >= fold_table$Validation_Start[i] &
+      train_data$Date <= fold_table$Validation_End[i]
+
+    x_fold_train =
+      x_matrix[
+        fold_train_index,
+        ,
+        drop = FALSE
+      ]
+
+    y_fold_train =
+      y_vector[
+        fold_train_index
+      ]
+
+    x_fold_valid =
+      x_matrix[
+        fold_valid_index,
+        ,
+        drop = FALSE
+      ]
+
+    y_fold_valid =
+      y_vector[
+        fold_valid_index
+      ]
+
+    fold_fit = glmnet(
+      x_fold_train,
+      y_fold_train,
+      alpha = alpha_value,
+      lambda = lambda_grid,
+      family = "gaussian",
+      standardize = TRUE
+    )
+
+    fold_predictions = predict(
+      fold_fit,
+      newx = x_fold_valid,
+      s = lambda_grid
+    )
+
+    actual_matrix = matrix(
+      y_fold_valid,
+      nrow = length(y_fold_valid),
+      ncol = length(lambda_grid)
+    )
+
+    mae_values = colMeans(
+      abs(
+        actual_matrix -
+        fold_predictions
+      )
+    )
+
+    rmse_values = sqrt(
+      colMeans(
+        (
+          actual_matrix -
+          fold_predictions
+        )^2
+      )
+    )
+
+    sst = sum(
+      (
+        y_fold_valid -
+        mean(y_fold_valid)
+      )^2
+    )
+
+    r2_values =
+      1 -
+      colSums(
+        (
+          actual_matrix -
+          fold_predictions
+        )^2
+      ) / sst
+
+    fold_result = data.frame(
+      Alpha = alpha_value,
+      Fold = i,
+      Lambda = lambda_grid,
+      MAE = mae_values,
+      RMSE = rmse_values,
+      R2 = r2_values
+    )
+
+    all_results = rbind(
+      all_results,
+      fold_result
+    )
+  }
+
+  return(all_results)
+}
+
+summarize_lambda_results = function(cv_results) {
+
+  lambda_values = sort(
+    unique(cv_results$Lambda),
+    decreasing = TRUE
+  )
+
+  summary_table = data.frame()
+
+  for(lambda_value in lambda_values) {
+
+    temp = cv_results[
+      cv_results$Lambda == lambda_value,
+    ]
+
+    summary_table = rbind(
+      summary_table,
+      data.frame(
+        Alpha = unique(temp$Alpha)[1],
+        Lambda = lambda_value,
+        Mean_MAE = mean(temp$MAE),
+        SD_MAE = sd(temp$MAE),
+        Mean_RMSE = mean(temp$RMSE),
+        SD_RMSE = sd(temp$RMSE),
+        Mean_R2 = mean(temp$R2),
+        SD_R2 = sd(temp$R2)
+      )
+    )
+  }
+
+  summary_table =
+    summary_table[
+      order(
+        summary_table$Mean_RMSE
+      ),
+    ]
+
+  rownames(summary_table) = NULL
+
+  return(summary_table)
+}
+```
+
+# 13. Ridge Regression
+
+## 13.1 Tune lambda
+
+```{r ridge-tuning}
+ridge_path = glmnet(
+  x_train,
+  y_train,
+  alpha = 0,
+  family = "gaussian",
+  standardize = TRUE,
+  nlambda = 80
+)
+
+ridge_cv_results =
+  chronological_glmnet_cv(
+    alpha_value = 0,
+    train_data = train_df,
+    x_matrix = x_train,
+    y_vector = y_train,
+    fold_table = validation_folds,
+    lambda_grid = ridge_path$lambda
+  )
+
+ridge_cv_summary =
+  summarize_lambda_results(
+    ridge_cv_results
+  )
+
+best_ridge_lambda =
+  ridge_cv_summary$Lambda[1]
+
+best_ridge_lambda
+
+head(ridge_cv_summary, 10)
+```
+
+**Project selected lambda:** approximately **38.776**.
+
+## 13.2 Final Ridge model
+
+```{r ridge-final}
+ridge_final = glmnet(
+  x_train,
+  y_train,
+  alpha = 0,
+  lambda = best_ridge_lambda,
+  family = "gaussian",
+  standardize = TRUE
+)
+
+ridge_test_pred = as.numeric(
+  predict(
+    ridge_final,
+    newx = x_test
+  )
+)
+
+ridge_test_metrics =
+  regression_metrics(
+    y_test,
+    ridge_test_pred
+  )
+
+ridge_test_metrics
+```
+
+**Project test result:** RMSE ≈ **142.20**.
+
+# 14. LASSO Regression
+
+## 14.1 Tune lambda
+
+```{r lasso-tuning}
+lasso_path = glmnet(
+  x_train,
+  y_train,
+  alpha = 1,
+  family = "gaussian",
+  standardize = TRUE,
+  nlambda = 80
+)
+
+lasso_cv_results =
+  chronological_glmnet_cv(
+    alpha_value = 1,
+    train_data = train_df,
+    x_matrix = x_train,
+    y_vector = y_train,
+    fold_table = validation_folds,
+    lambda_grid = lasso_path$lambda
+  )
+
+lasso_cv_summary =
+  summarize_lambda_results(
+    lasso_cv_results
+  )
+
+best_lasso_lambda =
+  lasso_cv_summary$Lambda[1]
+
+best_lasso_lambda
+
+head(lasso_cv_summary, 10)
+```
+
+**Project selected lambda:** approximately **14.8198**.
+
+## 14.2 Final LASSO model and selected predictors
+
+```{r lasso-final}
+lasso_final = glmnet(
+  x_train,
+  y_train,
+  alpha = 1,
+  lambda = best_lasso_lambda,
+  family = "gaussian",
+  standardize = TRUE
+)
+
+lasso_test_pred = as.numeric(
+  predict(
+    lasso_final,
+    newx = x_test
+  )
+)
+
+lasso_test_metrics =
+  regression_metrics(
+    y_test,
+    lasso_test_pred
+  )
+
+lasso_coef =
+  as.matrix(
+    coef(lasso_final)
+  )
+
+lasso_coef_table = data.frame(
+  Variable = rownames(lasso_coef),
+  Coefficient = as.numeric(lasso_coef[, 1])
+)
+
+lasso_selected =
+  lasso_coef_table[
+    lasso_coef_table$Variable != "(Intercept)" &
+    lasso_coef_table$Coefficient != 0,
+  ]
+
+lasso_selected
+lasso_test_metrics
+```
+
+**Project finding:** LASSO retains only the Japan market indicator at the selected penalty level.
+
+# 15. Elastic Net Regression
+
+## 15.1 Tune alpha and lambda
+
+```{r elastic-tuning}
+elastic_alpha_grid = c(
+  0.25,
+  0.50,
+  0.75
+)
+
+elastic_all_summary =
+  data.frame()
+
+for(alpha_value in elastic_alpha_grid) {
+
+  elastic_path = glmnet(
+    x_train,
+    y_train,
+    alpha = alpha_value,
+    family = "gaussian",
+    standardize = TRUE,
+    nlambda = 80
+  )
+
+  elastic_cv =
+    chronological_glmnet_cv(
+      alpha_value = alpha_value,
+      train_data = train_df,
+      x_matrix = x_train,
+      y_vector = y_train,
+      fold_table = validation_folds,
+      lambda_grid = elastic_path$lambda
+    )
+
+  elastic_summary =
+    summarize_lambda_results(
+      elastic_cv
+    )
+
+  elastic_all_summary =
+    rbind(
+      elastic_all_summary,
+      elastic_summary
+    )
+}
+
+elastic_all_summary =
+  elastic_all_summary[
+    order(
+      elastic_all_summary$Mean_RMSE
+    ),
+  ]
+
+rownames(elastic_all_summary) = NULL
+
+best_elastic_alpha =
+  elastic_all_summary$Alpha[1]
+
+best_elastic_lambda =
+  elastic_all_summary$Lambda[1]
+
+best_elastic_alpha
+best_elastic_lambda
+
+head(elastic_all_summary, 15)
+```
+
+**Project selection:**
+
+- Alpha = **0.75**
+- Lambda ≈ **9.8171**
+
+## 15.2 Final Elastic Net model
+
+```{r elastic-final}
+elastic_final = glmnet(
+  x_train,
+  y_train,
+  alpha = best_elastic_alpha,
+  lambda = best_elastic_lambda,
+  family = "gaussian",
+  standardize = TRUE
+)
+
+elastic_test_pred = as.numeric(
+  predict(
+    elastic_final,
+    newx = x_test
+  )
+)
+
+elastic_test_metrics =
+  regression_metrics(
+    y_test,
+    elastic_test_pred
+  )
+
+elastic_coef =
+  as.matrix(
+    coef(elastic_final)
+  )
+
+elastic_coef_table = data.frame(
+  Variable = rownames(elastic_coef),
+  Coefficient = as.numeric(elastic_coef[, 1])
+)
+
+elastic_selected =
+  elastic_coef_table[
+    elastic_coef_table$Variable != "(Intercept)" &
+    elastic_coef_table$Coefficient != 0,
+  ]
+
+elastic_selected
+elastic_test_metrics
+```
+
+**Project finding:** Elastic Net retains the Japan indicator and a small November effect at the selected penalty level.
+
+# 16. Final Model Comparison
+
+```{r final-comparison}
+model_comparison = data.frame(
+  Model = c(
+    "Training Mean Baseline",
+    "Reduced MLR",
+    "Poisson GLM",
+    "Negative Binomial GLM",
+    "Ridge Regression",
+    "LASSO Regression",
+    "Elastic Net Regression"
+  ),
+  Test_MAE = c(
+    baseline_test_metrics["MAE"],
+    mlr_test_metrics["MAE"],
+    poisson_test_metrics["MAE"],
+    nb_test_metrics["MAE"],
+    ridge_test_metrics["MAE"],
+    lasso_test_metrics["MAE"],
+    elastic_test_metrics["MAE"]
+  ),
+  Test_RMSE = c(
+    baseline_test_metrics["RMSE"],
+    mlr_test_metrics["RMSE"],
+    poisson_test_metrics["RMSE"],
+    nb_test_metrics["RMSE"],
+    ridge_test_metrics["RMSE"],
+    lasso_test_metrics["RMSE"],
+    elastic_test_metrics["RMSE"]
+  ),
+  Test_R2 = c(
+    baseline_test_metrics["R2"],
+    mlr_test_metrics["R2"],
+    poisson_test_metrics["R2"],
+    nb_test_metrics["R2"],
+    ridge_test_metrics["R2"],
+    lasso_test_metrics["R2"],
+    elastic_test_metrics["R2"]
+  )
+)
+
+model_comparison =
+  model_comparison[
+    order(
+      model_comparison$Test_RMSE
+    ),
+  ]
+
+rownames(model_comparison) = NULL
+
+kable(
+  model_comparison,
+  digits = 4,
+  caption = "Final Holdout Model Comparison"
+)
+```
+
+# 17. Actual vs Predicted - Reduced MLR
+
+```{r mlr-actual-predicted}
+plot(
+  test_df$Quantity,
+  mlr_test_pred,
+  main = "Reduced MLR: Actual vs Predicted Quantity",
+  xlab = "Actual Quantity",
+  ylab = "Predicted Quantity"
+)
+
+abline(
+  0,
+  1,
+  lty = 2
+)
+```
+
+# 18. Final Model Interpretation
+
+The **Reduced MLR** has the lowest holdout RMSE in the project comparison:
+
+- Test MAE ≈ **116.84**
+- Test RMSE ≈ **137.95**
+- Test R-squared ≈ **0.3987**
+
+The Poisson and Negative Binomial models achieve very similar prediction errors, but Poisson suffers from extreme overdispersion. Negative Binomial is therefore a more defensible count-model alternative.
+
+The regularized models are useful sensitivity checks, but none produces a lower holdout RMSE than the reduced MLR.
+
+The Reduced MLR is retained as the main organizational model because it combines:
+
+- competitive predictive performance;
+- low multicollinearity after reduction;
+- straightforward implementation;
+- interpretable coefficients;
+- robust HC3 inference for heteroscedasticity.
+
+# 19. Important Limitations
+
+- Historical observational data do not establish causality.
+- Japan transactions are concentrated in one buyer and within the Main Dealer/current-regime structure.
+- Repeated transactions from the same buyers may violate complete observation-level independence.
+- The models predict **transaction-level Quantity**, not total monthly demand.
+- The April-June 2026 holdout is one future evaluation period and does not guarantee identical future performance.
+- The MLR predictions shrink toward the middle and do not reproduce the full range of extreme orders.
+- Regularized coefficients are affected by shrinkage and should not be interpreted like ordinary unpenalized regression coefficients.
+
+# 20. Task 5 Conclusion
+
+The modelling exercise shows that demand is predictable to a useful but limited degree from the available transaction characteristics. The strongest predictive signal is associated with the export-market structure, especially Japan-labelled transactions, but this association is confounded with buyer structure and must be interpreted cautiously.
+
+The final model comparison supports retaining the **Reduced Multiple Linear Regression** as the primary predictive model, with **Negative Binomial regression** as the main alternative distributional model.

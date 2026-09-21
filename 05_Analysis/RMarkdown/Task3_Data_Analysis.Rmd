@@ -1,0 +1,562 @@
+---
+title: "Task 3 - Dataset Understanding, Cleaning and Descriptive Analysis"
+author: "IT3081 Statistical Modelling"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: true
+    df_print: paged
+  html_notebook:
+    toc: true
+    toc_float: true
+    number_sections: true
+    code_folding: show
+subtitle: Retail Product Demand Analysis at Fragceylon
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 9,
+  fig.height = 6,
+  fig.align = "center"
+)
+
+options(scipen = 999)
+
+project_root = "C:/Users/saths/Desktop/Sliit/3rd year/3rd Year 1st sem/IT3081-SM/Project/IT3081-Fragceylon-Retail-Demand-Analysis"
+knitr::opts_knit$set(root.dir = project_root)
+
+library(readxl)
+library(knitr)
+```
+
+# 1. Purpose of Task 3
+
+Task 3 prepares the Fragceylon sales data for statistical modelling and provides the descriptive evidence needed to understand the demand pattern before inferential or predictive modelling.
+
+The analysis has two parts:
+
+1. **Task 3A - Dataset audit and cleaning**
+2. **Task 3B - Descriptive analysis and business insights**
+
+The main demand variable is **Quantity on Regular Order rows**. Free Sample rows are retained in the cleaned master dataset but are not treated as commercial demand.
+
+# 2. Raw Dataset
+
+## 2.1 Load the raw workbook
+
+```{r load-raw}
+raw_file = "03_Raw_Data/Fragceylon_Sales_Dataset.xlsx"
+
+excel_sheets(raw_file)
+
+raw_df = read_excel(
+  raw_file,
+  sheet = "Sales Data"
+)
+
+dim(raw_df)
+head(raw_df)
+```
+
+## 2.2 Why inspect the raw structure?
+
+Before analysis, we need to verify:
+
+- the number of observations and variables;
+- the data type of each variable;
+- missing values;
+- duplicate records;
+- whether the response variable is numerically valid;
+- whether business-specific record types such as Free Samples need separate treatment.
+
+```{r raw-structure}
+str(raw_df)
+summary(raw_df)
+```
+
+# 3. Task 3A - Dataset Audit and Cleaning
+
+## 3.1 Dataset dimensions and variables
+
+```{r dimensions}
+cat("Rows:", nrow(raw_df), "\n")
+cat("Columns:", ncol(raw_df), "\n")
+names(raw_df)
+```
+
+**Expected project result:** 5,481 rows and 11 original variables.
+
+## 3.2 Missing-value check
+
+**Why this check is required:** Missing values can reduce the usable sample size and may bias statistical results if they are not handled appropriately.
+
+```{r missing-values}
+missing_by_variable = colSums(is.na(raw_df))
+
+missing_by_variable
+cat("Total missing values:", sum(missing_by_variable), "\n")
+```
+
+**Interpretation:** The project dataset contains no missing values, so no imputation or row deletion is required.
+
+## 3.3 Exact duplicate check
+
+**Why this check is required:** Exact duplicates can incorrectly increase frequencies, totals and apparent sample size.
+
+```{r duplicates}
+exact_duplicate_count = sum(duplicated(raw_df))
+cat("Exact duplicate rows:", exact_duplicate_count, "\n")
+```
+
+**Interpretation:** No exact duplicate rows were found.
+
+## 3.4 Order ID integrity
+
+```{r order-id}
+cat("Unique Order IDs:", length(unique(raw_df$`Order ID`)), "\n")
+cat("Duplicate Order IDs:", sum(duplicated(raw_df$`Order ID`)), "\n")
+```
+
+**Interpretation:** Order IDs are unique, so every row represents a distinct recorded line/order identifier.
+
+## 3.5 Product coverage
+
+```{r products}
+table(raw_df$`Product Name`)
+table(raw_df$`Product Code`)
+```
+
+The four perfumes included in this project are:
+
+- Dark Matrix
+- Kennedy
+- Mesmerose
+- Secret Ambrosia
+
+## 3.6 Line Type analysis
+
+**Why this matters:** Free Samples have a different business meaning from Regular Orders. Including free samples in demand modelling would mix promotional activity with actual commercial demand.
+
+```{r line-types}
+table(raw_df$`Line Type`)
+```
+
+## 3.7 Free Sample validation
+
+```{r sample-validation}
+sample_df_raw = raw_df[
+  raw_df$`Line Type` == "Free Sample",
+]
+
+summary(sample_df_raw$Quantity)
+summary(sample_df_raw$`Total Value (LKR)`)
+
+cat(
+  "All Free Samples have Quantity = 1:",
+  all(sample_df_raw$Quantity == 1),
+  "\n"
+)
+
+cat(
+  "All Free Samples have Total Value = 0:",
+  all(sample_df_raw$`Total Value (LKR)` == 0),
+  "\n"
+)
+```
+
+**Interpretation:** Free Samples are structurally different from paid orders and are separated from the commercial-demand modelling population.
+
+## 3.8 Regular Order validation
+
+```{r regular-validation}
+regular_df_raw = raw_df[
+  raw_df$`Line Type` == "Regular Order",
+]
+
+summary(regular_df_raw$Quantity)
+
+cat(
+  "Commercial demand:",
+  sum(regular_df_raw$Quantity),
+  "\n"
+)
+
+cat(
+  "Regular-order revenue (LKR):",
+  formatC(
+    sum(regular_df_raw$`Total Value (LKR)`),
+    format = "f",
+    digits = 2,
+    big.mark = ","
+  ),
+  "\n"
+)
+```
+
+## 3.9 Price and total-value validation
+
+**Why this check is required:** Total Value is derived from Quantity and Unit Price. The relationship should be validated before using the data.
+
+```{r price-validation}
+regular_total_check =
+  abs(
+    regular_df_raw$`Total Value (LKR)` -
+    regular_df_raw$Quantity * regular_df_raw$`Unit Price (LKR)`
+  )
+
+cat(
+  "Regular rows with total-value mismatch:",
+  sum(regular_total_check > 0.01),
+  "\n"
+)
+
+sort(unique(raw_df$`Unit Price (LKR)`))
+```
+
+**Important modelling decision:** `Total Value (LKR)` is not used as a predictor of Quantity because it directly contains Quantity and would create target leakage.
+
+## 3.10 Date range
+
+```{r date-range}
+raw_df$Date = as.Date(raw_df$Date)
+
+cat("Start date:", format(min(raw_df$Date)), "\n")
+cat("End date:", format(max(raw_df$Date)), "\n")
+cat("Recorded transaction dates:", length(unique(raw_df$Date)), "\n")
+```
+
+## 3.11 Structural change in sales channel
+
+**Why this matters:** The sales structure changes on 1 April 2025. Before that date, Shop and Small Dealer transactions appear; after that date, the data are Main Dealer transactions. Therefore Channel Type and the business regime are strongly confounded.
+
+```{r regime-audit}
+regime = ifelse(
+  raw_df$Date < as.Date("2025-04-01"),
+  "Pre-April-2025",
+  "Post-April-2025"
+)
+
+table(regime, raw_df$`Channel Type`)
+```
+
+**Interpretation:** Comparisons across the whole time period must account for this structural change. It would be misleading to interpret Channel Type as a simple causal driver without considering time/regime.
+
+## 3.12 IQR outlier detection for Regular Order Quantity
+
+**Why use the IQR rule?** The IQR rule is a simple non-parametric method that flags unusually high or low values without assuming normality.
+
+```{r iqr-outliers}
+Q1 = quantile(regular_df_raw$Quantity, 0.25)
+Q3 = quantile(regular_df_raw$Quantity, 0.75)
+IQR_value = IQR(regular_df_raw$Quantity)
+
+lower_fence = Q1 - 1.5 * IQR_value
+upper_fence = Q3 + 1.5 * IQR_value
+
+outlier_flag =
+  regular_df_raw$Quantity < lower_fence |
+  regular_df_raw$Quantity > upper_fence
+
+cat("Q1:", Q1, "\n")
+cat("Q3:", Q3, "\n")
+cat("IQR:", IQR_value, "\n")
+cat("Lower fence:", lower_fence, "\n")
+cat("Upper fence:", upper_fence, "\n")
+cat("IQR outliers:", sum(outlier_flag), "\n")
+
+summary(regular_df_raw$Quantity[outlier_flag])
+```
+
+**Interpretation:** The high-volume observations are valid recorded transactions rather than confirmed data-entry errors, so they are retained. Removing them only because they are large would discard real business demand.
+
+# 4. Derived Variables Used in Later Tasks
+
+The cleaned project dataset contains additional variables for descriptive, inferential and predictive analysis.
+
+```{r derived-variables}
+cleaned_file = "04_Cleaned_Data/Fragceylon_Cleaned_Master.xlsx"
+regular_file = "04_Cleaned_Data/Fragceylon_Regular_Orders.xlsx"
+sample_file = "04_Cleaned_Data/Fragceylon_Free_Samples.xlsx"
+
+cleaned_master = read_excel(cleaned_file)
+regular_orders = read_excel(regular_file)
+free_samples = read_excel(sample_file)
+
+cleaned_master$Date = as.Date(cleaned_master$Date)
+regular_orders$Date = as.Date(regular_orders$Date)
+free_samples$Date = as.Date(free_samples$Date)
+
+dim(cleaned_master)
+dim(regular_orders)
+dim(free_samples)
+
+names(cleaned_master)
+```
+
+Key derived variables include:
+
+- Year
+- Month
+- Month Number
+- Quarter
+- Day of Week
+- Year-Month
+- Time Trend
+- Sales Regime
+- Is Regular Order
+- Market Group
+- IQR Outlier Flag
+
+# 5. Cleaning Validation Summary
+
+```{r cleaning-validation}
+validation = data.frame(
+  Check = c(
+    "Cleaned master rows",
+    "Regular Order rows",
+    "Free Sample rows",
+    "Missing values",
+    "Commercial demand",
+    "IQR high outliers"
+  ),
+  Result = c(
+    nrow(cleaned_master),
+    nrow(regular_orders),
+    nrow(free_samples),
+    sum(is.na(cleaned_master)),
+    sum(regular_orders$Quantity),
+    sum(regular_orders$Outlier_IQR_Flag == "Yes")
+  )
+)
+
+kable(validation, caption = "Task 3A Cleaning Validation")
+```
+
+# 6. Task 3B - Descriptive Analysis
+
+## 6.1 Why descriptive analysis?
+
+Descriptive statistics summarize the size, centre, spread and distribution of demand before formal statistical tests are performed. They also identify important business patterns that should guide model specification.
+
+## 6.2 Overall Regular Order Quantity
+
+```{r overall-description}
+quantity_stats = data.frame(
+  Measure = c(
+    "N",
+    "Mean",
+    "Median",
+    "Standard Deviation",
+    "Variance",
+    "Minimum",
+    "Q1",
+    "Q3",
+    "Maximum"
+  ),
+  Value = c(
+    length(regular_orders$Quantity),
+    mean(regular_orders$Quantity),
+    median(regular_orders$Quantity),
+    sd(regular_orders$Quantity),
+    var(regular_orders$Quantity),
+    min(regular_orders$Quantity),
+    quantile(regular_orders$Quantity, 0.25),
+    quantile(regular_orders$Quantity, 0.75),
+    max(regular_orders$Quantity)
+  )
+)
+
+kable(
+  quantity_stats,
+  digits = 2,
+  caption = "Overall Regular Order Quantity Statistics"
+)
+```
+
+**Project result:** Mean Quantity is about 226.51 units, while the median is 199.5 units. The maximum is 998 units.
+
+## 6.3 Quantity distribution
+
+```{r quantity-histogram}
+hist(
+  regular_orders$Quantity,
+  main = "Distribution of Regular Order Quantity",
+  xlab = "Quantity",
+  ylab = "Frequency",
+  breaks = 30
+)
+```
+
+**Interpretation:** Quantity is widely dispersed and includes a small set of very large commercial orders.
+
+## 6.4 Product-level demand
+
+```{r product-demand}
+product_total = aggregate(
+  Quantity ~ `Product Name`,
+  data = regular_orders,
+  FUN = sum
+)
+
+product_mean = aggregate(
+  Quantity ~ `Product Name`,
+  data = regular_orders,
+  FUN = mean
+)
+
+product_n = aggregate(
+  Quantity ~ `Product Name`,
+  data = regular_orders,
+  FUN = length
+)
+
+names(product_total)[2] = "Total_Demand"
+names(product_mean)[2] = "Mean_Order_Quantity"
+names(product_n)[2] = "Number_of_Orders"
+
+product_summary = merge(
+  merge(product_total, product_mean, by = "Product Name"),
+  product_n,
+  by = "Product Name"
+)
+
+product_summary = product_summary[
+  order(product_summary$Total_Demand, decreasing = TRUE),
+]
+
+kable(
+  product_summary,
+  digits = 2,
+  caption = "Demand by Product"
+)
+```
+
+```{r product-barplot}
+barplot(
+  product_summary$Total_Demand,
+  names.arg = product_summary$`Product Name`,
+  main = "Total Demand by Product",
+  xlab = "Product",
+  ylab = "Total Quantity",
+  las = 2
+)
+```
+
+**Business insight:** Mesmerose records the highest total commercial demand in the observed period. Dark Matrix has the highest average order size. Total demand and average transaction size are different business measures and should not be confused.
+
+## 6.5 Channel-level demand
+
+```{r channel-demand}
+channel_summary = aggregate(
+  Quantity ~ `Channel Type`,
+  data = regular_orders,
+  FUN = sum
+)
+
+channel_summary = channel_summary[
+  order(channel_summary$Quantity, decreasing = TRUE),
+]
+
+kable(
+  channel_summary,
+  caption = "Total Demand by Channel"
+)
+```
+
+**Caution:** Channel results are strongly affected by the structural change on 1 April 2025. Channel differences should not be interpreted as causal effects across the full period.
+
+## 6.6 Export market demand
+
+```{r market-demand}
+market_summary = aggregate(
+  Quantity ~ `Export Market`,
+  data = regular_orders,
+  FUN = sum
+)
+
+kable(
+  market_summary,
+  caption = "Total Demand by Export Market"
+)
+```
+
+**Caution:** Japan transactions are concentrated in the Main Dealer structure and in one buyer. The Japan indicator is therefore an important association but not a standalone causal market effect.
+
+## 6.7 Monthly demand trend
+
+```{r monthly-demand}
+monthly_summary = aggregate(
+  Quantity ~ Year_Month,
+  data = regular_orders,
+  FUN = sum
+)
+
+monthly_summary = monthly_summary[
+  order(monthly_summary$Year_Month),
+]
+
+kable(
+  monthly_summary,
+  caption = "Monthly Commercial Demand"
+)
+```
+
+```{r monthly-line}
+plot(
+  seq_len(nrow(monthly_summary)),
+  monthly_summary$Quantity,
+  type = "o",
+  xaxt = "n",
+  main = "Monthly Commercial Demand",
+  xlab = "Year-Month",
+  ylab = "Total Quantity"
+)
+
+axis(
+  1,
+  at = seq_len(nrow(monthly_summary)),
+  labels = monthly_summary$Year_Month,
+  las = 2,
+  cex.axis = 0.7
+)
+```
+
+**Business insight:** December 2025 has the largest observed monthly total demand. October 2024 is only a partial first month because the dataset begins on 18 October 2024, so it should not be treated as a full-month comparison.
+
+## 6.8 Revenue by product
+
+```{r revenue-product}
+revenue_product = aggregate(
+  `Total Value (LKR)` ~ `Product Name`,
+  data = regular_orders,
+  FUN = sum
+)
+
+revenue_product = revenue_product[
+  order(revenue_product$`Total Value (LKR)`, decreasing = TRUE),
+]
+
+kable(
+  revenue_product,
+  digits = 2,
+  caption = "Regular Order Revenue by Product"
+)
+```
+
+# 7. Task 3 Main Findings
+
+The dataset is suitable for statistical modelling after separating Regular Orders from Free Samples. There are no missing values or exact duplicate rows. Commercial demand equals **705,810 units**, and Regular Order revenue equals approximately **LKR 246.71 million**.
+
+The IQR method identifies 41 high-volume transactions, but these were retained because they are valid business records. A major structural change occurs on **1 April 2025**, after which all observed transactions are Main Dealer records. This change is important for Task 4 inference and Task 5 predictive modelling.
+
+# 8. Task 3 Limitations
+
+- The dataset contains transaction-level records, not a complete measure of all possible market demand.
+- The first month, October 2024, is partial.
+- Channel Type is confounded with the pre/post April 2025 operating regime.
+- Japan records are structurally concentrated in one buyer.
+- Descriptive differences are associations and do not establish causality.
