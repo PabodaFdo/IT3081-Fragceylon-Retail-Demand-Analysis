@@ -1,0 +1,9 @@
+"Measure","Value"
+"Training observations",1599
+"Encoded predictors before zero-variance removal",22
+"Encoded predictors used for PCA",22
+"Observation-to-predictor ratio",72.6818181818182
+"Matrix rank",22
+"Condition number of standardized matrix",135.142681234326
+"Maximum absolute pairwise correlation",0.413591000455898
+"Number of absolute correlations >= 0.70",0

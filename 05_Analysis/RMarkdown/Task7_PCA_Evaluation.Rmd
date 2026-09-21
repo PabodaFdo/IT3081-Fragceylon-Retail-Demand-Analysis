@@ -1,0 +1,904 @@
+---
+title: "Task 7 - Critical Evaluation of Principal Component Analysis"
+subtitle: "Retail Product Demand Analysis at Fragceylon"
+author: "IT3081 Statistical Modelling"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    code_folding: show
+    theme: cosmo
+    highlight: textmate
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 9,
+  fig.height = 6,
+  fig.align = "center"
+)
+
+options(scipen = 999)
+
+project_root = "C:/Users/saths/Desktop/Sliit/3rd year/3rd Year 1st sem/IT3081-SM/Project/IT3081-Fragceylon-Retail-Demand-Analysis"
+
+knitr::opts_knit$set(
+  root.dir = project_root
+)
+
+library(readxl)
+library(knitr)
+
+chart_path = function(filename) {
+  normalizePath(
+    file.path(
+      project_root,
+      "06_Charts",
+      "R",
+      filename
+    ),
+    winslash = "/",
+    mustWork = TRUE
+  )
+}
+```
+
+# Task 7 Overview
+
+Task 7 critically evaluates whether **Principal Component Analysis (PCA)** would be beneficial for the Fragceylon retail product demand dataset.
+
+The assignment requires discussion of:
+
+- whether dimensionality reduction is necessary;
+- possible advantages of PCA;
+- limitations;
+- expected impact on predictive modelling;
+- situations where PCA should and should not be used;
+- research support for the final argument.
+
+PCA is **not forced into the final modelling workflow** simply because it appears in the assignment.
+
+The evaluation is based on two stages:
+
+1. **Applicability audit of the original Fragceylon variables**
+2. **Exploratory PCA and Principal Component Regression (PCR) sensitivity analysis**
+
+The second stage uses the same current-regime modelling population and chronological train/test split used in Task 5 so that predictive performance can be compared fairly.
+
+---
+
+# 1. Why PCA Must Be Evaluated Before It Is Used
+
+Principal Component Analysis transforms a set of correlated numerical variables into a smaller set of uncorrelated linear combinations called **principal components**.
+
+PCA can be useful when:
+
+- there are many numerical predictors;
+- predictors are strongly correlated;
+- dimensionality reduction is needed;
+- model stability is affected by multicollinearity;
+- retaining every original feature is unnecessary.
+
+However, PCA is not automatically appropriate for every dataset.
+
+For Fragceylon, the first question is therefore:
+
+> **Does the current dataset actually contain enough suitable continuous predictors for PCA to provide meaningful dimensionality reduction?**
+
+---
+
+# 2. Load the Current Regular-Order Dataset
+
+```{r load-data}
+regular_orders = read_excel(
+  "04_Cleaned_Data/Fragceylon_Regular_Orders.xlsx"
+)
+
+regular_orders$Date = as.Date(
+  regular_orders$Date
+)
+
+dim(
+  regular_orders
+)
+
+names(
+  regular_orders
+)
+```
+
+The analytical dataset contains:
+
+- **3,116 Regular Order observations**
+- **22 variables**
+
+The response variable remains **Quantity**.
+
+---
+
+# 3. Numeric Variable Audit
+
+A variable being stored as numeric in R does **not** automatically mean it is appropriate for PCA.
+
+The Task 7 script therefore first audited all numeric variables.
+
+```{r numeric-audit}
+numeric_audit = read.csv(
+  "08_Model_Results/R/Task7_Numeric_Variable_Audit.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  numeric_audit,
+  caption = "Numeric Variable Audit"
+)
+```
+
+## Interpretation
+
+The dataset contains several numeric variables, but many are unsuitable for standard PCA.
+
+Examples include:
+
+- `Quantity` - response variable;
+- `Total Value (LKR)` - derived from Quantity × Unit Price;
+- `Year` - time label;
+- `Month_Number` - numeric coding of a cyclical category;
+- `Is_Regular_Order` - constant in the Regular Order dataset;
+- `Time_Trend` - meaningful numerical predictor.
+
+Therefore, simply selecting every numeric column would be statistically inappropriate.
+
+---
+
+# 4. PCA Variable Suitability Audit
+
+```{r variable-suitability}
+pca_suitability = read.csv(
+  "08_Model_Results/R/Task7_Variable_Suitability_Audit.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  pca_suitability,
+  caption = "Suitability of Fragceylon Variables for Standard PCA"
+)
+```
+
+## Main finding
+
+After considering analytical meaning rather than storage type, **Time_Trend is the only clean continuous primary predictor clearly suitable for ordinary PCA**.
+
+This means standard PCA on the original meaningful predictor set is not naturally useful because PCA needs multiple numerical variables in order to reduce dimensionality.
+
+---
+
+# 5. Why Important Variables Are Not Natural PCA Inputs
+
+## Product Name
+
+`Product Name` is categorical.
+
+The four products are business categories rather than points on a continuous numerical scale.
+
+## Export Market
+
+`Export Market` is categorical.
+
+Local and Japan are distinct categories rather than continuous values.
+
+## Month and Day of Week
+
+Month and Day of Week are categorical and cyclical.
+
+For example, December is not meaningfully "twelve times" January.
+
+Treating month numbers directly as an ordinary continuous variable would be misleading.
+
+## Quantity
+
+Quantity is the response being explained or predicted.
+
+Including it in predictor PCA would mix the target with the predictors.
+
+## Total Value
+
+Total Value is calculated from:
+
+\[
+TotalValue = Quantity \times UnitPrice
+\]
+
+Therefore it contains direct information about the response and would create **target leakage**.
+
+## Unit Price
+
+Unit Price is genuinely numeric, but its values follow business pricing rules and were deliberately excluded from the main Task 5 generalizable predictor set.
+
+---
+
+# 6. Is Dimensionality Reduction Necessary?
+
+The exploratory PCA stage used the same broader Task 5 predictor set:
+
+- Product Name
+- Export Market
+- Month
+- Day of Week
+- Time Trend
+
+Categorical variables were converted to dummy variables using `model.matrix()`.
+
+```{r predictor-audit}
+predictor_matrix_audit = read.csv(
+  "08_Model_Results/R/Task7_PCA_Predictor_Matrix_Audit.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  predictor_matrix_audit,
+  digits = 4,
+  caption = "Encoded Predictor Matrix Audit"
+)
+```
+
+## Interpretation
+
+The resulting modelling space contains:
+
+- **1,599 training observations**
+- **22 encoded predictors**
+- observation-to-predictor ratio of approximately **72.68**
+
+This is not a high-dimensional problem in which the number of predictors is close to or larger than the number of observations.
+
+The matrix is also full rank.
+
+The maximum absolute pairwise correlation is approximately **0.414**, and there are no predictor pairs with absolute correlation of at least 0.70.
+
+Therefore, severe raw pairwise correlation is not a major reason to apply PCA.
+
+---
+
+# 7. Why an Exploratory PCA Was Still Performed
+
+Although standard PCA is not naturally required by the original data structure, an exploratory PCA was performed for two reasons:
+
+1. to quantify how much dimensionality reduction could actually be achieved;
+2. to test whether PCA-based regression improves future holdout prediction.
+
+This is a **sensitivity analysis**, not a recommendation to use PCA operationally.
+
+The PCA model was fitted using the training data only.
+
+This avoids test-data leakage.
+
+---
+
+# 8. Why Centering and Scaling Are Required
+
+PCA is affected by the scale of input variables.
+
+The encoded predictors include:
+
+- binary dummy variables;
+- numerical Time Trend.
+
+Without standardization, Time Trend would dominate the PCA because its numerical range is much larger.
+
+Therefore, the exploratory PCA used:
+
+```r
+prcomp(
+  x_train,
+  center = TRUE,
+  scale. = TRUE
+)
+```
+
+This places the variables on comparable standardized scales before component extraction.
+
+---
+
+# 9. Explained Variance
+
+```{r explained-variance}
+pca_variance = read.csv(
+  "08_Model_Results/R/Task7_PCA_Explained_Variance.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  head(
+    pca_variance,
+    22
+  ),
+  digits = 4,
+  caption = "Explained Variance by Principal Component"
+)
+```
+
+# 10. Scree Plot
+
+```{r scree-plot, echo=FALSE, out.width="85%"}
+knitr::include_graphics(
+  chart_path(
+    "Task7_01_PCA_Scree_Plot.png"
+  )
+)
+```
+
+## Interpretation
+
+The scree plot shows that variance is spread across many components rather than being captured by only a small number of dominant components.
+
+This is an important warning sign against using PCA as a major dimensionality-reduction tool in this dataset.
+
+---
+
+# 11. Cumulative Explained Variance
+
+```{r cumulative-chart, echo=FALSE, out.width="85%"}
+knitr::include_graphics(
+  chart_path(
+    "Task7_02_PCA_Cumulative_Variance.png"
+  )
+)
+```
+
+The number of components required at common variance thresholds is:
+
+```{r variance-thresholds}
+variance_thresholds = read.csv(
+  "08_Model_Results/R/Task7_PCA_Variance_Thresholds.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  variance_thresholds,
+  digits = 2,
+  caption = "Principal Components Required at Different Variance Thresholds"
+)
+```
+
+The results show:
+
+- **80% variance requires 15 components**
+- **90% variance requires 17 components**
+- **95% variance requires 19 components**
+
+The original encoded feature set contains only 22 predictors.
+
+Therefore, retaining 95% of the predictor variance reduces:
+
+\[
+22 \text{ predictors} \rightarrow 19 \text{ components}
+\]
+
+Only three dimensions are removed.
+
+This represents approximately:
+
+\[
+\frac{22-19}{22} \times 100
+\approx 13.6\%
+\]
+
+dimensionality reduction.
+
+That is a relatively small reduction compared with the loss of direct business interpretability.
+
+---
+
+# 12. PCA Loadings
+
+The principal-component loadings indicate how strongly each original encoded predictor contributes to a component.
+
+```{r pc1-loadings}
+pc1_loadings = read.csv(
+  "08_Model_Results/R/Task7_PC1_Loadings_Ranked.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  head(
+    pc1_loadings,
+    10
+  ),
+  digits = 4,
+  caption = "Largest Absolute Loadings for PC1"
+)
+```
+
+PC1 is driven mainly by:
+
+- Time Trend;
+- March;
+- January;
+- May;
+- other time-related dummy variables.
+
+Therefore, PC1 primarily represents a complex mixture of time progression and calendar structure.
+
+---
+
+# 13. PC2 Loadings
+
+```{r pc2-loadings}
+pc2_loadings = read.csv(
+  "08_Model_Results/R/Task7_PC2_Loadings_Ranked.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  head(
+    pc2_loadings,
+    10
+  ),
+  digits = 4,
+  caption = "Largest Absolute Loadings for PC2"
+)
+```
+
+PC2 is dominated by:
+
+- Mesmerose;
+- Kennedy;
+- smaller contributions from month, market and weekday indicators.
+
+This illustrates an important interpretability problem.
+
+Instead of management directly seeing:
+
+- Product;
+- Market;
+- Month;
+- Day;
+
+PCA creates abstract combinations such as:
+
+> PC2 = negative Mesmerose contribution + positive Kennedy contribution + smaller contributions from several other indicators.
+
+This is mathematically valid but less useful for management communication.
+
+---
+
+# 14. PC1 vs PC2 Score Plot
+
+```{r score-plot, echo=FALSE, out.width="85%"}
+knitr::include_graphics(
+  chart_path(
+    "Task7_03_PC1_PC2_Scores_By_Market.png"
+  )
+)
+```
+
+## Interpretation
+
+This score plot is exploratory only.
+
+It should **not** be interpreted as evidence that Local and Japan transactions form causal or naturally independent market clusters.
+
+The Japan category is already known to be structurally concentrated in one buyer and within the current Main Dealer regime.
+
+---
+
+# 15. Principal Component Regression
+
+PCA itself is unsupervised.
+
+It identifies directions that explain predictor variation, not necessarily directions that best explain **Quantity**.
+
+To assess potential predictive value, Principal Component Regression (PCR) was tested.
+
+PCR first transforms the predictor space using PCA and then uses selected principal components as predictors in a regression model.
+
+The same chronological test set from Task 5 was used.
+
+---
+
+# 16. Why PCA Can Lose Predictive Information
+
+The first principal components explain the greatest variation in the **predictors**.
+
+However, predictor variance is not the same as predictive relevance.
+
+A low-variance principal component could still contain information strongly associated with Quantity.
+
+This is exactly why the PCR models are evaluated against the existing Reduced MLR rather than assuming that fewer components must improve prediction.
+
+---
+
+# 17. PCR Holdout Results
+
+```{r pcr-performance}
+pcr_comparison = read.csv(
+  "08_Model_Results/R/Task7_PCR_Performance_Comparison.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  pcr_comparison,
+  digits = 4,
+  caption = "PCA/PCR Holdout Performance Comparison"
+)
+```
+
+The main PCR results are approximately:
+
+| PCR model | Components | Test RMSE | Test R-squared |
+|---|---:|---:|---:|
+| 80% variance | 15 | 169.04 | 0.0971 |
+| 90% variance | 17 | 166.16 | 0.1277 |
+| 95% variance | 19 | 139.66 | 0.3837 |
+| All PCs | 22 | 140.19 | 0.3790 |
+
+The aggressive dimensionality reductions perform poorly.
+
+This shows that removing components purely because they explain less predictor variance can remove information that is still useful for predicting Quantity.
+
+---
+
+# 18. Comparison with the Task 5 Reduced MLR
+
+The Task 5 Reduced MLR produced:
+
+- MAE ≈ **116.84**
+- RMSE ≈ **137.95**
+- R-squared ≈ **0.3987**
+
+The strongest PCR specification, using 19 components, produced:
+
+- MAE ≈ **118.11**
+- RMSE ≈ **139.66**
+- R-squared ≈ **0.3837**
+
+Therefore:
+
+\[
+PCR\ RMSE - MLR\ RMSE
+\approx 1.715
+\]
+
+The best PCR RMSE is approximately **1.24% higher** than the Reduced MLR RMSE.
+
+Thus PCA-based regression does not improve future holdout prediction.
+
+---
+
+# 19. PCR vs MLR Chart
+
+```{r rmse-chart, echo=FALSE, out.width="90%"}
+knitr::include_graphics(
+  chart_path(
+    "Task7_04_PCR_RMSE_Comparison.png"
+  )
+)
+```
+
+## Interpretation
+
+The chart confirms that the Reduced MLR achieves the lowest holdout RMSE among the models being compared here.
+
+The 95% PCR model comes relatively close, but it requires 19 abstract components.
+
+Therefore PCA produces:
+
+- no predictive improvement;
+- only limited dimensionality reduction;
+- lower interpretability.
+
+---
+
+# 20. Overall PCA Applicability Assessment
+
+```{r applicability}
+pca_applicability = read.csv(
+  "08_Model_Results/R/Task7_PCA_Applicability_Assessment.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  pca_applicability,
+  caption = "Overall PCA Applicability Assessment for Fragceylon"
+)
+```
+
+---
+
+# 21. Potential Advantages of PCA
+
+Although PCA is not recommended for the current Fragceylon dataset, it has genuine potential advantages in appropriate settings.
+
+## 21.1 Reduced dimensionality
+
+When many correlated numerical predictors exist, PCA can represent most of their information using fewer components.
+
+## 21.2 Orthogonal components
+
+Principal components are uncorrelated by construction.
+
+This can help when severe multicollinearity creates unstable regression coefficients.
+
+## 21.3 Computational simplification
+
+High-dimensional models may become faster and simpler after reducing hundreds of predictors to a smaller number of components.
+
+## 21.4 Noise reduction
+
+Components explaining very little variation can sometimes represent noise rather than useful structure.
+
+However, this is not guaranteed, especially for prediction.
+
+---
+
+# 22. Limitations of PCA for Fragceylon
+
+## 22.1 Most important variables are categorical
+
+Product, Market, Month and Day of Week are business categories.
+
+Standard PCA is naturally designed for numerical variables.
+
+Dummy encoding makes PCA technically possible but changes the interpretation of the resulting components.
+
+## 22.2 Reduced interpretability
+
+The Task 5 Reduced MLR directly relates demand to:
+
+- Product;
+- Export Market;
+- Day of Week.
+
+PCA replaces these direct variables with combinations such as PC1, PC2 and PC3.
+
+This makes it harder to explain results to managers.
+
+## 22.3 Limited dimensionality reduction
+
+Nineteen components are required to preserve 95% of predictor variance from only 22 original encoded predictors.
+
+This is not a major reduction.
+
+## 22.4 No predictive improvement
+
+The best PCR model performs slightly worse than the Reduced MLR.
+
+## 22.5 PCA ignores the response when extracting components
+
+PCA maximizes predictor variance, not predictive power for Quantity.
+
+Important low-variance predictive information can therefore be discarded.
+
+## 22.6 Scaling affects results
+
+Variables must be standardized when they are measured on different numerical scales.
+
+Different scaling choices can change PCA results.
+
+---
+
+# 23. Effect of PCA on Predictive Modelling
+
+For Fragceylon, PCA has both theoretical and practical consequences for modelling.
+
+### Possible positive effect
+
+PCA can remove multicollinearity because the components are orthogonal.
+
+### Current practical result
+
+The Task 5 Reduced MLR had already solved the severe multicollinearity problem through model simplification.
+
+Its maximum VIF was low.
+
+Therefore, PCA is not required merely to address multicollinearity.
+
+### Predictive result
+
+PCR did not improve holdout RMSE.
+
+Thus PCA adds complexity without delivering a corresponding predictive gain.
+
+---
+
+# 24. Situations Where PCA Should Be Used
+
+PCA could be useful for Fragceylon in the future if the company begins collecting a much richer set of correlated continuous measures.
+
+Examples include:
+
+- advertising spend by campaign;
+- website visits;
+- product-page views;
+- click-through rates;
+- conversion rates;
+- customer engagement scores;
+- customer rating dimensions;
+- repeat-purchase indicators;
+- inventory measures;
+- delivery-time measures;
+- product/fragrance attribute scores;
+- promotion intensity metrics;
+- supplier performance measurements;
+- customer behavioural scores.
+
+If these variables become numerous and strongly correlated, PCA could become a useful exploratory and modelling tool.
+
+---
+
+# 25. Situations Where PCA Should Not Be Used
+
+PCA should generally not be used when:
+
+- there are only a few predictors;
+- most predictors are categorical;
+- original-variable interpretation is essential;
+- predictors already have low multicollinearity;
+- dimensionality reduction is minimal;
+- principal components do not improve validation performance;
+- variables include target leakage;
+- scaling or coding decisions make components difficult to justify.
+
+The current Fragceylon dataset matches several of these conditions.
+
+---
+
+# 26. Alternatives to PCA for the Current Dataset
+
+For the current problem, more suitable approaches include:
+
+## Model simplification
+
+The Reduced MLR achieved strong performance while retaining understandable predictors.
+
+## Ridge Regression
+
+Ridge can handle correlated encoded predictors while preserving the original feature structure.
+
+## LASSO
+
+LASSO can perform shrinkage and automatic variable selection.
+
+## Elastic Net
+
+Elastic Net combines Ridge and LASSO behaviour.
+
+These methods were already evaluated in Task 5 and maintain a more direct connection between predictors and business interpretation than PCA.
+
+---
+
+# 27. Business Interpretation
+
+From a management perspective, the value of a statistical model is not limited to prediction accuracy.
+
+Management also needs to understand:
+
+- which business variables matter;
+- how the model can inform decisions;
+- what assumptions are involved;
+- how results should be interpreted.
+
+A model based on Product, Market and Day of Week is easier to communicate than a model based on 19 principal components.
+
+Therefore, PCA would reduce transparency without providing a clear statistical benefit in the current analysis.
+
+---
+
+# 28. Future Data Collection and PCA
+
+The current conclusion does not mean PCA is permanently irrelevant to Fragceylon.
+
+Future data expansion could change the situation.
+
+For example, Fragceylon could collect:
+
+- multiple product attribute scores;
+- customer survey dimensions;
+- digital campaign metrics;
+- social-media engagement variables;
+- inventory-performance metrics;
+- supplier/service metrics;
+- detailed customer behavioural indicators.
+
+If dozens of correlated continuous variables become available, PCA could then be reconsidered.
+
+---
+
+# 29. Research Literature Support
+
+The assignment requires the Task 7 argument to be supported by research findings.
+
+**No research references are fabricated in this R Markdown file.**
+
+Before final submission, verified papers from the Task 2 literature matrix should be used to support statements about:
+
+- when PCA is useful;
+- dimensionality reduction;
+- PCA and multicollinearity;
+- scaling;
+- information loss;
+- interpretability;
+- PCA before predictive modelling;
+- PCR performance;
+- PCA with mixed/categorical data;
+- PCA use in retail or marketing analytics.
+
+A recommended literature integration style is:
+
+```text
+Claim:
+PCA is most useful when a dataset contains multiple correlated numerical variables and dimensionality reduction is required.
+
+Research support:
+[Insert verified peer-reviewed source]
+
+Application to Fragceylon:
+The current predictor set contains few clean continuous variables and therefore does not strongly match this use case.
+```
+
+Research literature should be used to **support the reasoning**, not replace the empirical findings from the Fragceylon dataset.
+
+---
+
+# 30. Task 7 Final Evaluation
+
+The empirical evaluation indicates that PCA is **not currently necessary as the primary dimensionality-reduction or predictive method for Fragceylon**.
+
+The main reasons are:
+
+- only one clean continuous primary predictor is naturally suitable for ordinary PCA;
+- important business predictors are categorical;
+- the encoded modelling space contains only 22 predictors for 1,599 training observations;
+- no pair of encoded predictors has absolute correlation above 0.70;
+- 19 principal components are required to retain 95% of predictor variance;
+- the best PCR model has a higher holdout RMSE than the Reduced MLR;
+- principal components are less interpretable for management.
+
+Therefore, the Task 5 Reduced MLR remains more suitable for the current organizational use case.
+
+PCA should be reconsidered only if future data collection produces a substantially larger set of correlated continuous predictors.
+
+---
+
+# Appendix A - Explained Variance Table
+
+```{r appendix-variance}
+kable(
+  pca_variance,
+  digits = 4,
+  caption = "Full PCA Explained Variance Table"
+)
+```
+
+# Appendix B - Full PCA Loadings
+
+```{r appendix-loadings}
+pca_loadings = read.csv(
+  "08_Model_Results/R/Task7_PCA_Loadings.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  pca_loadings,
+  digits = 4,
+  caption = "Full Exploratory PCA Loading Matrix"
+)
+```
+
+# Appendix C - Task 7 Output Files
+
+```{r appendix-files}
+task7_results = list.files(
+  "08_Model_Results/R",
+  pattern = "^Task7",
+  full.names = FALSE
+)
+
+task7_results
+```

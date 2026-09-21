@@ -1,0 +1,8 @@
+"Variable","Class","Unique_Values","Minimum","Maximum"
+"Quantity","numeric",571,23,998
+"Unit Price (LKR)","numeric",6,330.6,450
+"Total Value (LKR)","numeric",904,9832.5,347304
+"Year","numeric",3,2024,2026
+"Month_Number","numeric",12,1,12
+"Time_Trend","numeric",474,0,620
+"Is_Regular_Order","numeric",1,1,1

@@ -1,0 +1,39 @@
+TASK 7 - CRITICAL EVALUATION OF PRINCIPAL COMPONENT ANALYSIS
+
+ASSIGNMENT PURPOSE
+Task 7 requires a critical evaluation of whether PCA is beneficial for the Fragceylon dataset. PCA is not forced into the final model.
+
+ORIGINAL DATA SUITABILITY
+The current dataset has limited suitability for standard PCA because most important predictors are categorical. Quantity is the response variable, Total Value contains Quantity and would create target leakage, Unit Price follows business pricing rules, and several other numeric-looking variables are time codes rather than independent continuous measurements.
+
+CLEAN CONTINUOUS PREDICTORS
+The main clean continuous predictor suitable for ordinary PCA is Time_Trend. A useful standard PCA normally requires multiple continuous variables, so PCA is not naturally necessary on the original predictor set.
+
+EXPLORATORY ENCODED PCA
+For sensitivity analysis, the same broader Task 5 predictor set was dummy encoded and PCA was fitted on the training period only. This is a technical demonstration rather than a recommendation because principal components combine categorical dummy variables with Time_Trend and reduce business interpretability.
+
+ENCODED PREDICTOR COUNT
+22 predictors for 1599 training observations.
+
+COMPONENTS REQUIRED
+80% variance: 15 components
+90% variance: 17 components
+95% variance: 19 components
+
+PREDICTIVE SENSITIVITY CHECK
+Best exploratory PCR model: PCR - 95% Variance (19 PCs) 
+Best PCR test RMSE: 139.6632 
+Reduced MLR test RMSE: 137.9482 
+PCR minus MLR RMSE: 1.715 
+
+INTERPRETATION
+The best exploratory PCR did not improve holdout RMSE relative to the Reduced MLR. This provides no predictive reason to replace the simpler and more interpretable Task 5 model with PCA-based regression.
+
+CURRENT RECOMMENDATION
+PCA is not recommended as the primary dimensionality-reduction or predictive approach for the current Fragceylon dataset. The dataset is not strongly high-dimensional, has few clean continuous independent predictors, and relies heavily on meaningful categorical business variables whose interpretation would be obscured by principal components.
+
+WHEN PCA COULD BECOME USEFUL
+PCA could be reconsidered if future data collection adds many correlated continuous variables such as marketing spend metrics, website engagement measures, customer behaviour scores, inventory measures, product/fragrance attributes, ratings and other high-dimensional business indicators.
+
+LITERATURE REQUIREMENT
+The final Task 7 report section must support the critical evaluation with verified research literature. No research references are fabricated by this R script.
