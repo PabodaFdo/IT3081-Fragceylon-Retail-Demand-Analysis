@@ -1,0 +1,2 @@
+"Comparison","Scope","Local_n","Japan_n","Local_Mean","Japan_Mean","Mean_Difference","t_Statistic","Degrees_of_Freedom","p_value","CI_95_Lower","CI_95_Upper","Cohens_d","Hedges_g","Brown_Forsythe_F","Brown_Forsythe_p","Variance_Ratio"
+"Japan - Local","Same buyer, Main Dealer, Post-April-2025",151,185,283.701986754967,622.52972972973,338.827742974763,18.0612399912332,308.817118282584,2.85974471145774e-50,301.914273151175,375.74121279835,1.88872204822908,1.88447772901957,35.9835097642471,5.1727039611728e-09,2.76479621993726

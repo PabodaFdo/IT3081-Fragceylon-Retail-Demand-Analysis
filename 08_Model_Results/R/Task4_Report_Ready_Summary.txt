@@ -1,0 +1,69 @@
+TASK 4 - STATISTICAL INFERENCE
+
+Significance level: 0.05
+Confidence level: 95%
+Main response variable: Quantity
+Main dataset: Regular Orders only
+
+1. PRODUCT MEAN DIFFERENCES
+Business Question: Does mean Regular Order Quantity differ among the four perfumes?
+H0: Mean Quantity is equal across all four products.
+H1: At least one product has a different mean Quantity.
+Selected Test: One-way ANOVA.
+Result: F(3, 3112) = 0.3821, p = 0.765907.
+Eta-squared = 0.000368; adjusted omega-squared = 0.
+Conclusion: Fail to reject H0. Mean transaction-level Quantity does not show a statistically supported product difference.
+Business meaning: Differences in total product demand are likely influenced more by order frequency than by substantially different average transaction sizes.
+
+2. PRODUCT QUANTITY VARIABILITY
+H0: Quantity variance is equal across the four products.
+H1: At least one product has a different variance.
+Brown-Forsythe F = 0.1349, p = 0.939264.
+Variance ratio = 1.1208.
+Conclusion: Fail to reject H0. The data do not show a statistically significant difference in product-level transaction Quantity variability.
+
+3. CONTROLLED LOCAL VS JAPAN COMPARISON
+Scope: Same buyer (Prabath Liyanarachchi), Main Dealer channel, post-April-2025 regime.
+H0: Mean Japan Quantity = Mean Local Quantity.
+H1: Mean Japan Quantity differs from Mean Local Quantity.
+Selected Test: Welch independent-samples t-test.
+Local n = 151, mean = 283.702.
+Japan n = 185, mean = 622.5297.
+t(308.82) = 18.0612, p = 2.859745e-50.
+Japan - Local mean difference = 338.8277 units; 95% CI [301.9143, 375.7412].
+Hedges g = 1.8845.
+Conclusion: Reject H0. The controlled subset shows a statistically significant association between market label and transaction Quantity.
+Limitation: This is observational repeated-buyer data and should not be interpreted as a causal market effect.
+
+4. PRE-APRIL SHOP VS SMALL DEALER
+H0: Mean Small Dealer Quantity = Mean Shop Quantity.
+H1: Mean quantities differ.
+Selected Test: Welch independent-samples t-test.
+Shop mean = 29.8921; Small Dealer mean = 173.1225.
+t(351.14) = 37.0431, p = 2.396245e-123.
+Small Dealer - Shop mean difference = 143.2304 units; 95% CI [135.6258, 150.8349].
+Hedges g = 3.4927.
+Conclusion: Reject H0. Mean transaction Quantity differed strongly between Shop and Small Dealer records in the pre-April operating regime.
+Limitation: Channel differences are connected to the historical business structure and should not be described as causal channel effects.
+
+5. POST-APRIL CALENDAR MONTH COMPARISON
+H0: Mean Quantity is equal across represented calendar months.
+H1: At least one calendar month differs.
+Selected Test: Welch one-way ANOVA.
+F(11, 173.55) = 1.1124, p = 0.354153.
+Welch f-squared = 0.006309.
+Conclusion: Fail to reject H0. The post-April data do not provide statistically significant evidence of different mean transaction Quantity across calendar months.
+Limitation: The available data do not contain multiple complete annual cycles, so this is not proof that seasonality is absent.
+
+6. PRODUCT ROBUSTNESS
+After excluding the 41 valid high-volume orders: F = 0.529, p = 0.662352.
+Post-April product-only comparison: F = 0.2901, p = 0.832578.
+Both robustness analyses produce the same substantive conclusion as the primary product ANOVA.
+
+GENERAL LIMITATIONS
+- Historical observational data do not establish causality.
+- Multiple transactions may belong to the same buyer, so complete observation-level independence may not hold.
+- Channel Type and Sales Regime are structurally linked around 1 April 2025.
+- All Japan records belong to one buyer in the Main Dealer/post-April structure.
+- The 41 high-volume transactions are valid business observations and are retained in the primary analyses.
+- Calendar-month analysis should not be interpreted as a complete seasonal study because the dataset does not contain multiple complete annual cycles.

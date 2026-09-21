@@ -1,0 +1,2 @@
+"Analysis","Scope","Test","F_Statistic","DF1","DF2","p_value","Brown_Forsythe_F","Brown_Forsythe_p","Variance_Ratio","Welch_f_squared","Welch_f"
+"Calendar-month mean Quantity","Post-April-2025 only","Welch ANOVA",1.11239992894779,11,173.551938868101,0.354152764106044,0.981687486958966,0.460702636065519,2.39575289545572,0.00630905518989007,0.0794295611840458

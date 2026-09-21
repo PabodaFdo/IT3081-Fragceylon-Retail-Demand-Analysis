@@ -1,0 +1,6 @@
+"Analysis","Scope","Test","Statistic","DF1_or_df","DF2","p_value","Effect_Size_Name","Effect_Size","Mean_Difference","CI_95_Lower","CI_95_Upper","Decision"
+"Product mean Quantity","All Regular Orders","One-way ANOVA",0.382114426464868,3,3112,0.765906517282898,"Eta-squared",0.000368226595537119,NA,NA,NA,"Fail to reject H0"
+"Product Quantity variability","All Regular Orders","Brown-Forsythe",0.13489714710861,3,3112,0.939263635060132,"Variance ratio",1.12077585710088,NA,NA,NA,"Fail to reject H0"
+"Japan vs Local Quantity","Same buyer, Main Dealer, post-April","Welch t-test",18.0612399912332,308.817118282584,NA,2.85974471145774e-50,"Hedges g",1.88447772901957,338.827742974763,301.914273151175,375.74121279835,"Reject H0"
+"Small Dealer vs Shop Quantity","Pre-April-2025 only","Welch t-test",37.0431200608027,351.135201317695,NA,2.39624462618261e-123,"Hedges g",3.49272069294098,143.230363314251,135.625785041451,150.834941587052,"Reject H0"
+"Calendar-month mean Quantity","Post-April-2025 only","Welch ANOVA",1.11239992894779,11,173.551938868101,0.354152764106044,"Welch f-squared",0.00630905518989007,NA,NA,NA,"Fail to reject H0"
