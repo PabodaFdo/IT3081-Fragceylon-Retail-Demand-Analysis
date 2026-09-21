@@ -1,0 +1,18 @@
+TASK 3B - INITIAL BUSINESS INSIGHTS
+
+Overall Regular Orders: 3116 
+Overall Commercial Demand: 705810 units
+Overall Regular Order Revenue (LKR): 246,708,257.80 
+
+Highest total-demand product: Mesmerose - 215866 units
+Lowest total-demand product: Secret Ambrosia - 141892 units
+Highest average order quantity product: Dark Matrix - 230.03 units per order
+Highest-demand Year-Month: 2025-12 - 115818 units
+Lowest-demand Year-Month: 2024-10 - 1556 units
+Largest total-demand channel: Main Dealer - 622595 units
+Largest total-demand market: Local - 590642 units
+
+INTERPRETATION LIMITATION
+Channel and Sales_Regime are strongly associated because the sales-channel structure changed on 1 April 2025.
+Japan records are associated with one buyer, Main Dealer channel, and the post-April-2025 regime.
+Therefore these descriptive differences should not be interpreted as causal channel or market effects.
