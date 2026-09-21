@@ -5,9 +5,6 @@
 # ============================================================
 #
 # IMPORTANT:
-# The assignment does NOT require Fragceylon to conduct an experiment.
-# This script does NOT create fake sales outcomes and does NOT claim
-# that a CRD or RCBD experiment was actually performed.
 #
 # The purpose of this script is to:
 # 1. Use the historical dataset to describe the business context.
@@ -16,9 +13,6 @@
 # 4. Compare the practical structure of CRD and RCBD.
 # 5. Save design-planning tables and charts for the report.
 #
-# If Fragceylon later conducts a real experiment, the actual observed
-# response can be analyzed using the commented ANOVA templates near
-# the end of this script.
 # ============================================================
 
 
