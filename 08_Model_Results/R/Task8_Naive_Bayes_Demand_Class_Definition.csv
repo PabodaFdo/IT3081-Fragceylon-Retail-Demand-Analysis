@@ -1,0 +1,4 @@
+"Demand_Class","Quantity_Rule","Threshold_Source"
+"Low","Quantity <= 213.6667","Training-data tertile"
+"Medium","213.6667 < Quantity <= 380","Training-data tertiles"
+"High","Quantity > 380","Training-data tertile"

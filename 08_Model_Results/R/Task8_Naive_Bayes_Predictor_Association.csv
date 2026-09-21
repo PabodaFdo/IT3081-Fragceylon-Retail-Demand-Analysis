@@ -1,0 +1,7 @@
+"Predictor_1","Predictor_2","Cramers_V"
+"Product Name","Export Market",0.0400546818720591
+"Product Name","Month",0.0779105018478388
+"Product Name","Day_of_Week",0.05009898269347
+"Export Market","Month",0.0701855263329318
+"Export Market","Day_of_Week",0.0791003955881961
+"Month","Day_of_Week",0.10403407257651

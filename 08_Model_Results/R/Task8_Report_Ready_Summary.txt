@@ -1,0 +1,25 @@
+TASK 8 - CRITICAL EVALUATION OF BAYESIAN STATISTICAL METHODS
+
+NAIVE BAYES
+Naive Bayes is naturally a classification approach, while Fragceylon's main response Quantity is numeric. An exploratory three-class demand version was therefore created using training-data tertiles only. This conversion is useful for a coarse demand-risk view but loses substantial numerical information.
+
+Naive Bayes holdout accuracy: 0.3687 
+Naive Bayes balanced accuracy: 0.3822 
+Naive Bayes macro F1: 0.3486 
+Majority-class baseline accuracy: 0.347 
+
+BAYESIAN REGRESSION
+Bayesian regression is conceptually suitable because it can estimate continuous Quantity, incorporate prior information and update uncertainty as new data arrive. A normal-prior sensitivity illustration was performed using the same Reduced MLR predictor structure as Task 5. The priors are generic sensitivity assumptions and do not represent company expert beliefs.
+
+Reduced MLR holdout RMSE: 137.9482 
+Best illustrative normal-prior holdout RMSE: 137.9497 
+Best illustrative prior SD: 1000 
+
+BAYESIAN DECISION MAKING
+Bayesian decision making is highly relevant in principle because management decisions should combine predictive uncertainty with the costs of excess stock, stock-outs, shipping and missed sales. The script demonstrates this by combining posterior demand-class probabilities with two hypothetical loss structures. These losses are illustrative only and must not be interpreted as real Fragceylon cost values.
+
+CURRENT RECOMMENDATION
+Naive Bayes may be useful as an optional demand-category classifier but should not replace continuous Quantity modelling because categorization loses information. Bayesian regression is a plausible future extension, especially if Fragceylon can define defensible prior information and wants posterior uncertainty that can be updated over time. Bayesian decision making has strong future business relevance, but exact inventory actions require real cost and inventory information that is not currently available.
+
+LITERATURE REQUIREMENT
+The final Task 8 report section must support the evaluation with verified published research. No research references are fabricated by this R script.

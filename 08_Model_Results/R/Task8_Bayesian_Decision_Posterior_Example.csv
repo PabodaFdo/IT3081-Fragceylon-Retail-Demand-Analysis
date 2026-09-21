@@ -1,0 +1,2 @@
+"Order_ID","Date","Product","Export_Market","Month","Day_of_Week","Posterior_Low","Posterior_Medium","Posterior_High","Predicted_Demand_Class","Actual_Demand_Class_For_Later_Evaluation"
+"FC-04652","2026-04-01","Kennedy","Local","April","Wednesday",0.385959247214351,0.315053544073091,0.298987208712558,"Low","Medium"

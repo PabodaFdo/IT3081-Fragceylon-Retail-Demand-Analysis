@@ -1,0 +1,7 @@
+"Scenario","Action","Expected_Loss","Chosen_Action"
+"Balanced mismatch loss","Prepare Low Stock",0.913027961498207,FALSE
+"Balanced mismatch loss","Prepare Medium Stock",0.684946455926909,TRUE
+"Balanced mismatch loss","Prepare High Stock",1.08697203850179,FALSE
+"Higher stock-out loss","Prepare Low Stock",2.42403034042153,FALSE
+"Higher stock-out loss","Prepare Medium Stock",1.28292087335202,TRUE
+"Higher stock-out loss","Prepare High Stock",1.47293128571614,FALSE

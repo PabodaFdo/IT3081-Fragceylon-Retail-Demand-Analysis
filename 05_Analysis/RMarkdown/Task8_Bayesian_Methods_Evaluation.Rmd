@@ -1,0 +1,1038 @@
+---
+title: "Task 8 - Critical Evaluation of Bayesian Statistical Methods"
+subtitle: "Retail Product Demand Analysis at Fragceylon"
+author: "IT3081 Statistical Modelling"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    code_folding: show
+    theme: cosmo
+    highlight: textmate
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 9,
+  fig.height = 6,
+  fig.align = "center"
+)
+
+options(scipen = 999)
+
+project_root = "C:/Users/saths/Desktop/Sliit/3rd year/3rd Year 1st sem/IT3081-SM/Project/IT3081-Fragceylon-Retail-Demand-Analysis"
+
+knitr::opts_knit$set(
+  root.dir = project_root
+)
+
+library(readxl)
+library(knitr)
+
+chart_path = function(filename) {
+  normalizePath(
+    file.path(
+      project_root,
+      "06_Charts",
+      "R",
+      filename
+    ),
+    winslash = "/",
+    mustWork = TRUE
+  )
+}
+```
+
+# Task 8 Overview
+
+Task 8 critically evaluates the applicability of **Bayesian statistical methods** to the Fragceylon retail product demand problem.
+
+The required methods are:
+
+- Naive Bayes;
+- Bayesian Regression;
+- Bayesian Decision Making.
+
+The purpose of this section is not to assume that Bayesian methods are automatically superior to the models already evaluated in Task 5.
+
+Instead, the analysis asks:
+
+1. whether each Bayesian method is appropriate for the current Fragceylon problem;
+2. what advantages each method could provide;
+3. what limitations must be considered;
+4. when Bayesian approaches may become more useful than traditional methods;
+5. how Bayesian uncertainty could support organizational decisions.
+
+The empirical demonstrations in this task are **exploratory sensitivity analyses**.
+
+No company-specific prior beliefs, inventory-loss values, or cost assumptions are invented.
+
+---
+
+# 1. Data Context
+
+```{r load-data}
+regular_orders = read_excel(
+  "04_Cleaned_Data/Fragceylon_Regular_Orders.xlsx"
+)
+
+regular_orders$Date = as.Date(
+  regular_orders$Date
+)
+
+dim(
+  regular_orders
+)
+
+range(
+  regular_orders$Quantity
+)
+```
+
+The Regular Order dataset contains:
+
+- **3,116 observations**
+- Quantity values from **23 to 998**
+- 571 distinct Quantity values across the full Regular Order dataset
+
+The primary response remains **Quantity sold**.
+
+---
+
+# 2. Current-Regime Modelling Population
+
+The Bayesian sensitivity analyses use the same current-regime population and chronological split as Task 5.
+
+```{r split-context}
+current_regime = regular_orders[
+  regular_orders$Date >= as.Date("2025-04-01"),
+]
+
+train_data = current_regime[
+  current_regime$Date < as.Date("2026-04-01"),
+]
+
+test_data = current_regime[
+  current_regime$Date >= as.Date("2026-04-01"),
+]
+
+c(
+  Current_Regime = nrow(current_regime),
+  Training = nrow(train_data),
+  Testing = nrow(test_data)
+)
+```
+
+This gives:
+
+- **2,014 current-regime observations**
+- **1,599 training observations**
+- **415 test observations**
+
+The training period is:
+
+```text
+2025-04-01 to 2026-03-31
+```
+
+The testing period is:
+
+```text
+2026-04-01 to 2026-06-30
+```
+
+Using the same holdout structure allows direct comparison with the Task 5 Reduced MLR.
+
+---
+
+# 3. Bayesian Methods Considered
+
+The three Bayesian approaches serve different purposes.
+
+## 3.1 Naive Bayes
+
+Naive Bayes is primarily a **classification method**.
+
+Fragceylon's main response variable, Quantity, is continuous/count-like rather than categorical.
+
+Therefore, to demonstrate Naive Bayes, Quantity must first be converted into broad classes.
+
+## 3.2 Bayesian Regression
+
+Bayesian regression can model continuous Quantity while combining:
+
+- likelihood information from the observed data;
+- prior information;
+- posterior uncertainty.
+
+It is therefore conceptually closer to Fragceylon's main demand-modelling objective.
+
+## 3.3 Bayesian Decision Making
+
+Bayesian decision making combines:
+
+- predictive probabilities;
+- uncertainty;
+- business costs or losses.
+
+This is especially relevant to inventory-related decisions where overstocking and understocking have different consequences.
+
+---
+
+# 4. Naive Bayes Demand-Class Definition
+
+The Naive Bayes demonstration converts Quantity into three demand classes using **training-data tertiles only**.
+
+This avoids using future test information when defining the class boundaries.
+
+```{r class-definition}
+class_definition = read.csv(
+  "08_Model_Results/R/Task8_Naive_Bayes_Demand_Class_Definition.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  class_definition,
+  caption = "Naive Bayes Demand-Class Definition"
+)
+```
+
+The thresholds are:
+
+- Low: Quantity ≤ **213.6667**
+- Medium: 213.6667 < Quantity ≤ **380**
+- High: Quantity > **380**
+
+These thresholds are analytical categories for this sensitivity exercise, not permanent business rules.
+
+---
+
+# 5. Demand-Class Distribution
+
+```{r demand-class-chart, echo=FALSE, out.width="85%"}
+knitr::include_graphics(
+  chart_path(
+    "Task8_01_Demand_Class_Distribution.png"
+  )
+)
+```
+
+The training-class counts are almost balanced:
+
+```text
+Low      533
+Medium   535
+High     531
+```
+
+The test counts are:
+
+```text
+Low      126
+Medium   144
+High     145
+```
+
+This means the Naive Bayes model is not being evaluated on a severely imbalanced classification problem.
+
+---
+
+# 6. Information Loss from Categorizing Quantity
+
+A major limitation of using Naive Bayes for this problem is that the original numerical response must be compressed into only three labels.
+
+```{r class-information}
+class_information = read.csv(
+  "08_Model_Results/R/Task8_Naive_Bayes_Class_Information.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  class_information,
+  digits = 4,
+  caption = "Quantity Information Within Each Demand Class"
+)
+```
+
+```{r information-loss}
+information_loss = read.csv(
+  "08_Model_Results/R/Task8_Naive_Bayes_Information_Loss_Summary.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  information_loss,
+  digits = 4,
+  caption = "Information Loss from Converting Quantity to Three Demand Classes"
+)
+```
+
+The training dataset contains:
+
+- **518 distinct Quantity values**
+- only **3 demand classes** after categorization
+
+This represents approximately **99.42% reduction in response-state resolution**.
+
+The classes therefore hide substantial differences between orders.
+
+For example, both Quantity = 381 and Quantity = 998 are labelled **High**, even though the actual business implications may differ greatly.
+
+---
+
+# 7. Naive Bayes Predictors
+
+The exploratory Naive Bayes classifier uses:
+
+- Product Name;
+- Export Market;
+- Month;
+- Day of Week.
+
+These are categorical predictors and therefore fit naturally into a categorical Naive Bayes framework.
+
+However, Naive Bayes assumes that predictors are conditionally independent given the class.
+
+That assumption is strong and may not be literally true in real retail data.
+
+---
+
+# 8. Naive Bayes Confusion Matrix
+
+```{r nb-confusion}
+nb_confusion = read.csv(
+  "08_Model_Results/R/Task8_Naive_Bayes_Confusion_Matrix.csv",
+  row.names = 1,
+  check.names = FALSE
+)
+
+kable(
+  nb_confusion,
+  caption = "Naive Bayes Confusion Matrix"
+)
+```
+
+The confusion matrix shows that:
+
+- Low-demand orders are detected relatively often;
+- Medium-demand orders are frequently misclassified as Low;
+- High-demand orders are only partly identified.
+
+This indicates weak separation between the three demand categories.
+
+---
+
+# 9. Naive Bayes Per-Class Performance
+
+```{r nb-class-metrics}
+nb_class_metrics = read.csv(
+  "08_Model_Results/R/Task8_Naive_Bayes_Per_Class_Metrics.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  nb_class_metrics,
+  digits = 4,
+  caption = "Naive Bayes Per-Class Metrics"
+)
+```
+
+The results show:
+
+- Low recall ≈ **0.6905**
+- Medium recall ≈ **0.1528**
+- High recall ≈ **0.3034**
+
+The Medium class is especially difficult for the model.
+
+Its F1 score is approximately **0.1991**, indicating poor balance between precision and recall.
+
+---
+
+# 10. Naive Bayes Overall Performance
+
+```{r nb-performance}
+nb_performance = read.csv(
+  "08_Model_Results/R/Task8_Naive_Bayes_Performance.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  nb_performance,
+  digits = 4,
+  caption = "Naive Bayes Holdout Performance"
+)
+```
+
+The Naive Bayes model achieves approximately:
+
+- Accuracy = **0.3687**
+- Balanced Accuracy = **0.3822**
+- Macro F1 = **0.3486**
+
+The majority-class baseline accuracy is approximately:
+
+- **0.3470**
+
+Therefore, the Naive Bayes model improves accuracy by only about:
+
+\[
+0.3687 - 0.3470 \approx 0.0217
+\]
+
+or approximately **2.17 percentage points**.
+
+This is a small improvement.
+
+---
+
+# 11. F1 Score by Demand Class
+
+```{r nb-f1-chart, echo=FALSE, out.width="85%"}
+knitr::include_graphics(
+  chart_path(
+    "Task8_02_Naive_Bayes_Class_F1.png"
+  )
+)
+```
+
+The chart emphasizes that classification quality varies substantially across demand classes.
+
+The Medium class performs worst.
+
+---
+
+# 12. Naive Bayes Independence Assumption
+
+The predictor-association audit uses Cramer's V to assess simple pairwise association between the categorical predictors.
+
+```{r nb-association}
+nb_association = read.csv(
+  "08_Model_Results/R/Task8_Naive_Bayes_Predictor_Association.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  nb_association,
+  digits = 4,
+  caption = "Categorical Predictor Association Audit"
+)
+```
+
+The observed Cramer's V values are low, approximately between 0.04 and 0.10.
+
+This suggests that there is no obvious strong pairwise association among these predictors in the training data.
+
+However, this **does not prove the Naive Bayes conditional-independence assumption**.
+
+Conditional independence is stronger than low marginal pairwise association.
+
+---
+
+# 13. Naive Bayes Evaluation
+
+## Advantages
+
+Naive Bayes offers:
+
+- simple probability-based classification;
+- relatively fast computation;
+- direct class probabilities;
+- straightforward interpretation of broad demand-risk categories.
+
+## Limitations
+
+For Fragceylon, the main limitations are:
+
+- Quantity must be converted from a numerical response into classes;
+- approximately 99.42% of response-state resolution is removed;
+- classification accuracy is low;
+- Medium demand is poorly identified;
+- the conditional-independence assumption is strong;
+- class boundaries are analytically chosen rather than established business thresholds.
+
+## Current assessment
+
+Naive Bayes may be useful as an **optional coarse demand-category view**, but it should not replace continuous Quantity modelling.
+
+---
+
+# 14. Bayesian Regression
+
+Bayesian regression is more directly aligned with Fragceylon's main demand problem because it can model **continuous Quantity**.
+
+A Bayesian regression can combine:
+
+\[
+Posterior \propto Likelihood \times Prior
+\]
+
+The posterior distribution represents updated uncertainty after combining prior information with observed data.
+
+Potential prior information could eventually come from:
+
+- previous years;
+- expert judgment;
+- historical product performance;
+- previous Bayesian model estimates;
+- external evidence.
+
+However, no such company-validated priors are currently available.
+
+---
+
+# 15. Illustrative Normal-Prior Sensitivity Analysis
+
+The Task 8 script therefore performs a **sensitivity analysis**, not a production Bayesian model.
+
+It uses the same Reduced MLR predictor structure as Task 5:
+
+```text
+Quantity ~ Product Name + Export Market + Day of Week
+```
+
+Slope coefficients are assigned zero-centered Normal priors with different standard deviations.
+
+The tested prior standard deviations are:
+
+```text
+25
+50
+100
+250
+1000
+```
+
+Smaller values represent stronger shrinkage toward zero.
+
+Larger values represent weaker priors.
+
+---
+
+# 16. Bayesian Regression Prior Sensitivity Results
+
+```{r bayes-regression-sensitivity}
+bayes_regression = read.csv(
+  "08_Model_Results/R/Task8_Bayesian_Regression_Prior_Sensitivity.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  bayes_regression,
+  digits = 4,
+  caption = "Illustrative Normal-Prior Regression Sensitivity"
+)
+```
+
+The main results are approximately:
+
+| Model | Test RMSE |
+|---|---:|
+| Reduced MLR | 137.9482 |
+| Prior SD = 25 | 141.3380 |
+| Prior SD = 50 | 138.6588 |
+| Prior SD = 100 | 138.1100 |
+| Prior SD = 250 | 137.9732 |
+| Prior SD = 1000 | 137.9497 |
+
+Stronger shrinkage produces worse predictive performance.
+
+As the prior becomes weaker, the Bayesian-style estimate approaches the ordinary Reduced MLR result.
+
+---
+
+# 17. Prior Sensitivity Chart
+
+```{r bayes-sensitivity-chart, echo=FALSE, out.width="85%"}
+knitr::include_graphics(
+  chart_path(
+    "Task8_03_Bayesian_Regression_Prior_Sensitivity.png"
+  )
+)
+```
+
+## Interpretation
+
+The dashed reference line represents the Task 5 Reduced MLR RMSE.
+
+The sensitivity analysis shows that generic zero-centered priors do not improve predictive performance.
+
+This does **not** imply that Bayesian regression is unsuitable.
+
+Instead, it shows that Bayesian modelling becomes most valuable when the priors are meaningful and defensible.
+
+---
+
+# 18. Illustrative Posterior Coefficients
+
+For interpretation, the script reports a middle prior setting:
+
+```text
+Slope prior SD = 100
+```
+
+```{r bayes-coefficients}
+bayes_coefficients = read.csv(
+  "08_Model_Results/R/Task8_Bayesian_Regression_Illustrative_Coefficients.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  bayes_coefficients,
+  digits = 4,
+  caption = "Illustrative Normal-Prior Posterior Coefficients"
+)
+```
+
+One notable coefficient is the Japan market indicator.
+
+Its illustrative posterior mean is approximately:
+
+```text
+328.92
+```
+
+with an approximate interval of:
+
+```text
+304.81 to 353.02
+```
+
+This remains an **association**, not a causal effect.
+
+The Japan market is structurally concentrated in a specific buyer and period, as discussed in earlier tasks.
+
+---
+
+# 19. Important Bayesian Regression Caution
+
+These results should be described carefully.
+
+The analysis:
+
+- uses a Gaussian likelihood;
+- estimates residual variance from the OLS model;
+- treats that variance as fixed;
+- uses generic prior scales for sensitivity analysis.
+
+Therefore, this should be called:
+
+> **an illustrative normal-prior Bayesian regression sensitivity analysis**
+
+rather than a fully specified production Bayesian model.
+
+A full Bayesian implementation would normally estimate the posterior uncertainty of all model parameters, including the residual variance.
+
+---
+
+# 20. Bayesian Regression Evaluation
+
+## Advantages
+
+Bayesian regression can:
+
+- retain continuous Quantity;
+- incorporate prior knowledge;
+- produce posterior distributions;
+- provide credible uncertainty statements;
+- update estimates as new sales data become available;
+- support sequential learning.
+
+## Limitations
+
+It also requires:
+
+- defensible prior distributions;
+- careful prior sensitivity checks;
+- more statistical expertise;
+- more computational work;
+- clear communication of posterior uncertainty.
+
+## Current assessment
+
+Bayesian regression is a plausible future extension for Fragceylon.
+
+However, the current generic-prior sensitivity analysis does not outperform the Reduced MLR.
+
+Therefore, Bayesian regression should not be adopted simply because it is more advanced.
+
+---
+
+# 21. Bayesian Decision Making
+
+Bayesian decision making moves beyond prediction.
+
+The basic idea is:
+
+\[
+Expected\ Loss(Action)
+=
+\sum P(State \mid Data) \times Loss(Action, State)
+\]
+
+Management can then select the action with the smallest expected loss.
+
+This is highly relevant to inventory decisions because the cost of:
+
+- excess stock;
+- stock-outs;
+- urgent shipping;
+- tied-up working capital;
+- missed sales;
+
+may differ substantially.
+
+---
+
+# 22. Posterior Probability Example
+
+The script uses the first chronological test observation only as an illustration.
+
+```{r decision-profile}
+decision_profile = read.csv(
+  "08_Model_Results/R/Task8_Bayesian_Decision_Posterior_Example.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  decision_profile,
+  digits = 4,
+  caption = "Illustrative Posterior Demand-Class Probabilities"
+)
+```
+
+For this observation, the posterior probabilities are approximately:
+
+- Low = **0.3860**
+- Medium = **0.3151**
+- High = **0.2990**
+
+The maximum-probability prediction is therefore **Low**.
+
+However, the actual later-observed class is Medium.
+
+The actual class is shown only for later evaluation and is not used to choose the decision.
+
+---
+
+# 23. Why the Most Probable Class Is Not Always the Best Decision
+
+A prediction answers:
+
+> Which state is most probable?
+
+A decision asks:
+
+> Which action has the smallest expected consequence?
+
+These are different questions.
+
+Even if Low is the most probable class, preparing Low stock may be undesirable if the cost of underestimating demand is large.
+
+This is where Bayesian decision theory adds value.
+
+---
+
+# 24. Illustrative Loss Structures
+
+The analysis uses two hypothetical relative-loss scenarios:
+
+## Balanced mismatch loss
+
+A moderate penalty is assigned to incorrect stock decisions.
+
+## Higher stock-out loss
+
+Underestimating demand is penalized more heavily.
+
+These loss values are **illustrative only**.
+
+They are not Fragceylon's real financial costs.
+
+---
+
+# 25. Expected-Loss Results
+
+```{r decision-loss}
+decision_loss = read.csv(
+  "08_Model_Results/R/Task8_Bayesian_Decision_Expected_Loss.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  decision_loss,
+  digits = 4,
+  caption = "Illustrative Bayesian Expected-Loss Decisions"
+)
+```
+
+Under the balanced-loss scenario:
+
+- Prepare Low Stock: expected loss ≈ **0.9130**
+- Prepare Medium Stock: expected loss ≈ **0.6849**
+- Prepare High Stock: expected loss ≈ **1.0870**
+
+Therefore the minimum expected loss is:
+
+```text
+Prepare Medium Stock
+```
+
+Under the higher stock-out-loss scenario:
+
+- Prepare Low Stock: expected loss ≈ **2.4240**
+- Prepare Medium Stock: expected loss ≈ **1.2829**
+- Prepare High Stock: expected loss ≈ **1.4729**
+
+Again, the minimum expected loss is:
+
+```text
+Prepare Medium Stock
+```
+
+---
+
+# 26. Expected-Loss Chart
+
+```{r decision-chart, echo=FALSE, out.width="90%"}
+knitr::include_graphics(
+  chart_path(
+    "Task8_04_Bayesian_Decision_Expected_Loss.png"
+  )
+)
+```
+
+## Interpretation
+
+The most probable demand class was Low.
+
+However, both illustrative loss structures prefer **Prepare Medium Stock**.
+
+This demonstrates an important principle:
+
+> the action that minimizes expected business loss does not always correspond to the single most probable demand category.
+
+This is one of the strongest potential organizational advantages of Bayesian decision making.
+
+---
+
+# 27. Why Real Costs Are Required Before Operational Use
+
+The current dataset does not contain a complete set of:
+
+- stock-out costs;
+- holding costs;
+- emergency shipping costs;
+- lost-margin estimates;
+- excess-inventory costs;
+- disposal or obsolescence costs.
+
+Therefore, the decision example cannot be treated as an actual inventory recommendation.
+
+Before operational Bayesian decision support is implemented, Fragceylon should estimate these real cost components.
+
+---
+
+# 28. Overall Bayesian Methods Applicability
+
+```{r applicability}
+bayesian_applicability = read.csv(
+  "08_Model_Results/R/Task8_Bayesian_Methods_Applicability.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  bayesian_applicability,
+  caption = "Overall Bayesian Methods Applicability Assessment"
+)
+```
+
+---
+
+# 29. When Bayesian Methods May Outperform Traditional Approaches
+
+Bayesian methods may become particularly useful when:
+
+- reliable prior information exists;
+- data arrive sequentially;
+- management needs full probability distributions rather than single estimates;
+- sample sizes are limited but prior information is credible;
+- uncertainty must be directly incorporated into decisions;
+- business costs differ strongly between types of errors.
+
+For Fragceylon, these conditions could become relevant as the organization collects more historical data and cost information.
+
+---
+
+# 30. When Bayesian Methods Should Not Be Forced
+
+Bayesian methods should not be used merely because they are more sophisticated.
+
+They may add unnecessary complexity when:
+
+- prior information is arbitrary;
+- ordinary models already perform adequately;
+- decision-makers do not need posterior probability statements;
+- cost/loss values are unknown;
+- the additional computational and communication burden produces little benefit.
+
+This is important in the current Fragceylon case.
+
+The Reduced MLR already provides competitive predictive performance and high interpretability.
+
+---
+
+# 31. Comparison of the Three Bayesian Approaches
+
+## Naive Bayes
+
+**Best role:** optional demand-category classification.
+
+**Current weakness:** weak classification performance and major information loss.
+
+## Bayesian Regression
+
+**Best role:** future continuous demand modelling with defensible priors and posterior uncertainty.
+
+**Current weakness:** generic priors do not improve holdout prediction.
+
+## Bayesian Decision Making
+
+**Best role:** future inventory and stock-planning decisions under uncertainty.
+
+**Current weakness:** real cost/loss inputs are currently unavailable.
+
+---
+
+# 32. Organizational Implications
+
+The Bayesian evaluation provides three practical insights.
+
+First, management should avoid converting continuous demand into broad classes unless the decision itself is genuinely categorical.
+
+Second, Bayesian regression may become valuable when Fragceylon has meaningful prior information from previous periods, products, markets or expert knowledge.
+
+Third, Bayesian decision making may eventually be more valuable than Bayesian prediction alone because inventory planning depends on both:
+
+- what is likely to happen;
+- what each possible error costs the business.
+
+---
+
+# 33. Research Literature Support
+
+The assignment requires this section to be supported using **published research**.
+
+No research references are fabricated in this R Markdown file.
+
+Before final submission, verified sources from the Task 2 literature matrix should be inserted to support:
+
+- Naive Bayes assumptions;
+- classification limitations caused by discretizing continuous outcomes;
+- Bayesian regression and prior information;
+- posterior updating;
+- prior sensitivity;
+- Bayesian decision theory;
+- expected-loss decision making;
+- Bayesian applications in forecasting, retail, inventory or demand management.
+
+A recommended integration format is:
+
+```text
+Claim:
+Bayesian regression can incorporate prior information and update uncertainty as new data become available.
+
+Research support:
+[Insert verified peer-reviewed source]
+
+Application to Fragceylon:
+This could allow demand estimates to be updated as new dealer and market observations are collected.
+```
+
+The literature should support the methodological reasoning while the Fragceylon empirical results provide the project-specific evidence.
+
+---
+
+# 34. Task 8 Final Evaluation
+
+The current evidence does not support replacing the Task 5 modelling framework with a Bayesian method simply because Bayesian methods are more advanced.
+
+**Naive Bayes** is only moderately useful as a coarse classifier. It requires conversion of 518 unique training Quantity values into three classes, causing approximately 99.42% reduction in response-state resolution, and its holdout accuracy is only approximately 0.3687.
+
+**Bayesian Regression** is conceptually better aligned with continuous demand modelling. However, generic prior sensitivity does not improve holdout prediction. The weakest prior tested produces RMSE almost identical to ordinary regression, indicating convergence toward the Reduced MLR.
+
+**Bayesian Decision Making** has the strongest future organizational relevance because it can combine predictive uncertainty with asymmetric business consequences. However, operational implementation requires real estimates of stock-out, holding, shipping, margin and excess-stock costs.
+
+Therefore:
+
+- Naive Bayes should remain an optional classification view;
+- Bayesian regression is a reasonable future modelling extension;
+- Bayesian decision making is a promising future decision-support framework;
+- the current Task 5 Reduced MLR remains more suitable for immediate organizational use.
+
+---
+
+# Appendix A - Naive Bayes Performance
+
+```{r appendix-nb}
+kable(
+  nb_performance,
+  digits = 4,
+  caption = "Naive Bayes Performance Summary"
+)
+```
+
+# Appendix B - Bayesian Regression Sensitivity
+
+```{r appendix-bayes-reg}
+kable(
+  bayes_regression,
+  digits = 4,
+  caption = "Full Bayesian Regression Prior Sensitivity Table"
+)
+```
+
+# Appendix C - Bayesian Decision Loss Matrices
+
+```{r appendix-loss-balanced}
+balanced_loss = read.csv(
+  "08_Model_Results/R/Task8_Bayesian_Decision_Balanced_Loss_Matrix.csv",
+  row.names = 1,
+  check.names = FALSE
+)
+
+kable(
+  balanced_loss,
+  caption = "Illustrative Balanced Loss Matrix"
+)
+```
+
+```{r appendix-loss-stockout}
+stockout_loss = read.csv(
+  "08_Model_Results/R/Task8_Bayesian_Decision_Stockout_Loss_Matrix.csv",
+  row.names = 1,
+  check.names = FALSE
+)
+
+kable(
+  stockout_loss,
+  caption = "Illustrative Higher Stock-Out Loss Matrix"
+)
+```
+
+# Appendix D - Task 8 Output Files
+
+```{r appendix-files}
+task8_results = list.files(
+  "08_Model_Results/R",
+  pattern = "^Task8",
+  full.names = FALSE
+)
+
+task8_results
+```

@@ -1,0 +1,4 @@
+"","Low","Medium","High"
+"Prepare Low Stock",0,1,2
+"Prepare Medium Stock",1,0,1
+"Prepare High Stock",2,1,0
