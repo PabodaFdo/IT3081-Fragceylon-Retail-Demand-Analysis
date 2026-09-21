@@ -3,17 +3,6 @@
 # Retail Product Demand Analysis at Fragceylon
 # TASK 6 - CRITICAL EVALUATION OF EXPERIMENTAL DESIGN
 # ============================================================
-#
-# IMPORTANT:
-#
-# The purpose of this script is to:
-# 1. Use the historical dataset to describe the business context.
-# 2. Create an illustrative future CRD randomization schedule.
-# 3. Create an illustrative future RCBD randomization schedule.
-# 4. Compare the practical structure of CRD and RCBD.
-# 5. Save design-planning tables and charts for the report.
-#
-# ============================================================
 
 
 # ============================================================
