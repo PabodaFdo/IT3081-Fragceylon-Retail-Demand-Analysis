@@ -1,0 +1,64 @@
+TASK 5B - ALTERNATIVE PREDICTIVE MODELS
+
+MODELLING POPULATION
+Current-regime Regular Orders: 2014 
+Training observations: 1599 
+Testing observations: 415 
+Training period: 2025-04-01 to 2026-03-31
+Testing period: 2026-04-01 to 2026-06-30
+
+POISSON GLM
+Poisson AIC: 121946.3 
+Poisson residual deviance: 110108.9 
+Poisson Pearson dispersion ratio: 63.8638 
+Poisson test MAE: 117.0443 
+Poisson test RMSE: 138.2679 
+Poisson test R-squared: 0.3959 
+Interpretation: The Pearson dispersion ratio indicates strong overdispersion, so the Poisson mean-variance assumption is not adequate for this dataset.
+
+NEGATIVE BINOMIAL GLM
+Theta: 3.7408 
+AIC: 20375.29 
+Test MAE: 116.9773 
+Test RMSE: 138.2694 
+Test R-squared: 0.3959 
+Interpretation: Negative Binomial regression was evaluated because it allows variance to exceed the mean and is therefore more flexible than Poisson for overdispersed count-like demand.
+
+RIDGE REGRESSION
+Optimal chronological-validation lambda: 38.77599 
+Test MAE: 119.5144 
+Test RMSE: 142.2037 
+Test R-squared: 0.3611 
+Interpretation: Ridge was used to shrink correlated encoded predictors without deleting them.
+
+LASSO REGRESSION
+Optimal chronological-validation lambda: 14.81977 
+Encoded predictors retained: 1 of 22 
+Test MAE: 117.7407 
+Test RMSE: 140.0535 
+Test R-squared: 0.3802 
+Interpretation: LASSO was used for both shrinkage and automatic selection of encoded predictors.
+
+ELASTIC NET REGRESSION
+Selected alpha: 0.75 
+Selected lambda: 9.817087 
+Test MAE: 116.9428 
+Test RMSE: 138.8364 
+Test R-squared: 0.391 
+Interpretation: Elastic Net combines Ridge and LASSO penalties and was tuned using chronological validation.
+
+MODEL COMPARISON
+Lowest holdout RMSE model: Reduced MLR 
+Lowest holdout RMSE: 137.9482 
+Corresponding MAE: 116.8403 
+Corresponding R-squared: 0.3987 
+
+Important: Prediction accuracy alone does not determine the final organizational recommendation. The final choice must also consider model assumptions, interpretability, robustness, ease of implementation and business usefulness.
+
+GENERAL INTERPRETATION LIMITATIONS
+- Historical observational data do not establish causality.
+- Japan transactions are structurally concentrated within one buyer and the Main Dealer/current-regime structure.
+- Repeated transactions from the same buyers may violate complete observation-level independence.
+- The models predict transaction-level Quantity, not aggregate monthly demand.
+- The Apr-Jun 2026 holdout period is one future evaluation period and does not guarantee identical future performance.
+- Regularized-model coefficients are affected by shrinkage and should not be interpreted like ordinary unpenalized regression coefficients.

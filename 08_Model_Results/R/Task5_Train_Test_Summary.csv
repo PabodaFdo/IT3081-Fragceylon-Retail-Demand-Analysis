@@ -1,0 +1,3 @@
+"Dataset","Rows","Start_Date","End_Date","Mean_Quantity","Median_Quantity","SD_Quantity","Min_Quantity","Max_Quantity"
+"Training",1599,"2025-04-01","2026-03-31",306.550343964978,295,170.596020802689,51,998
+"Testing",415,"2026-04-01","2026-06-30",319.086746987952,311,178.115693262139,51,988

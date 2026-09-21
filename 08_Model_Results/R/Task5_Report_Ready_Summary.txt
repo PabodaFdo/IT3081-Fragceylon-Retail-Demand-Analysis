@@ -1,0 +1,60 @@
+TASK 5 - PREDICTIVE STATISTICAL MODELLING
+
+Prediction objective:
+Estimate future Regular Order Quantity under Fragceylon's current post-April-2025 business structure.
+
+MODELLING POPULATION
+Current-regime rows: 2014 
+Current-regime dates: 2025-04-01 to 2026-06-30
+Response: Quantity
+
+TRAIN-TEST STRATEGY
+Training: 2025-04-01 to 2026-03-31; n = 1599 
+Testing : 2026-04-01 to 2026-06-30; n = 415 
+A chronological split was used because the practical objective is prediction of future transactions.
+
+PREDICTOR DECISIONS
+Initial candidates: Product Name, Export Market, Month, Day of Week and Time Trend.
+Channel Type and Sales Regime were excluded because both are constant in the current-regime modelling population.
+Buyer was excluded from the primary model to reduce customer-specific memorization.
+Total Value was excluded because it is directly derived from Quantity and would cause target leakage.
+
+BASELINE
+Training mean prediction: 306.5503 
+Test MAE: 137.0608 
+Test RMSE: 178.3421 
+Test R-squared: -0.005 
+
+INITIAL FULL MLR
+Formula: Quantity ~ Product Name + Export Market + Month + Day of Week + Time Trend
+Training R-squared: 0.326319 
+Adjusted R-squared: 0.316915 
+Test MAE: 118.1498 
+Test RMSE: 140.1878 
+Test R-squared: 0.379 
+Diagnostics identified severe multicollinearity between Month indicators and Time Trend and statistically significant heteroscedasticity.
+
+TRAINING-ONLY SPECIFICATION COMPARISON
+The reduced specification using Product Name, Export Market and Day of Week achieved the strongest balance of average chronological validation error, stability, parsimony and interpretability.
+
+FINAL SELECTED MLR
+Formula: Quantity ~ Product Name + Export Market + Day of Week
+Training R-squared: 0.31838 
+Adjusted R-squared: 0.314088 
+Test MAE: 116.8403 
+Test RMSE: 137.9482 
+Test R-squared: 0.3987 
+Test MAE improvement over baseline: 14.75 %
+Test RMSE improvement over baseline: 22.65 %
+
+ROBUST INFERENCE
+HC3 heteroscedasticity-robust standard errors were used for coefficient uncertainty because the Breusch-Pagan diagnostic indicated unequal residual variance.
+The Japan coefficient is large and positive in the selected model, but it must be interpreted as an association rather than a causal market effect because Japan transactions are structurally concentrated within one buyer and the Main Dealer/post-April regime.
+
+LIMITATIONS
+- Historical observational data do not establish causality.
+- Repeated transactions from the same buyers may violate complete observation-level independence.
+- Japan transactions are concentrated within one buyer structure.
+- The model predicts transaction-level Quantity, not aggregate monthly demand.
+- Test results describe the Apr-Jun 2026 holdout period and should not be treated as guaranteed future accuracy.
+- The 41 valid high-volume orders were retained; no observations were deleted simply because they were influential.

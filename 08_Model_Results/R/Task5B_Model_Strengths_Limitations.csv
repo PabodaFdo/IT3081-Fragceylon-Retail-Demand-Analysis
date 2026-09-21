@@ -1,0 +1,7 @@
+"Model","Main_Strength","Main_Limitation"
+"Reduced MLR","Simple, interpretable coefficients and strong benchmark performance.","Residual heteroscedasticity requires robust inference and predictions shrink toward the middle."
+"Poisson GLM","Natural count-model structure with positive fitted means and multiplicative interpretation.","Poisson assumes conditional mean and variance are similar; strong overdispersion makes this unsuitable."
+"Negative Binomial GLM","Handles overdispersion better than Poisson while preserving a count-model interpretation.","Less straightforward to explain than MLR and still inherits observational-data limitations."
+"Ridge Regression","Stabilizes correlated predictors through coefficient shrinkage.","Does not set coefficients exactly to zero and is less directly interpretable after standardization/shrinkage."
+"LASSO Regression","Performs regularization and can remove weak encoded predictors.","Selected variables can depend on the tuning period and correlated predictors may be selected unstably."
+"Elastic Net Regression","Combines Ridge shrinkage and LASSO variable selection.","Requires tuning both alpha and lambda and is less transparent to non-technical users."

@@ -1,0 +1,24 @@
+"Variable","Coefficient"
+"(Intercept)",275.642576051385
+"`Product Name`Kennedy",2.92005044335303
+"`Product Name`Mesmerose",-3.37791145020604
+"`Product Name`Secret Ambrosia",-9.82080352544348
+"`Export Market`Japan",272.019997446855
+"MonthAugust",11.1172280030221
+"MonthDecember",-8.43748331369458
+"MonthFebruary",8.04211850350497
+"MonthJanuary",7.18379606764629
+"MonthJuly",16.6212839768222
+"MonthJune",4.28301065129171
+"MonthMarch",-15.782506368314
+"MonthMay",42.4992974318349
+"MonthNovember",22.9265001987715
+"MonthOctober",-19.4575785865344
+"MonthSeptember",7.78257118478944
+"Day_of_WeekFriday",2.25430087141928
+"Day_of_WeekSaturday",4.20290215046394
+"Day_of_WeekSunday",15.7700004174555
+"Day_of_WeekThursday",4.03189569976434
+"Day_of_WeekTuesday",14.5815616248307
+"Day_of_WeekWednesday",3.75720178766903
+"Time_Trend",0.00204905378932827
