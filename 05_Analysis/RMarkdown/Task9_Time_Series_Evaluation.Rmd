@@ -1,0 +1,987 @@
+---
+title: "Task 9 - Critical Evaluation of Time Series Analysis"
+subtitle: "Retail Product Demand Analysis at Fragceylon"
+author: "IT3081 Statistical Modelling"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    code_folding: show
+    theme: cosmo
+    highlight: textmate
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 9,
+  fig.height = 6,
+  fig.align = "center"
+)
+
+options(scipen = 999)
+
+project_root = "C:/Users/saths/Desktop/Sliit/3rd year/3rd Year 1st sem/IT3081-SM/Project/IT3081-Fragceylon-Retail-Demand-Analysis"
+
+knitr::opts_knit$set(
+  root.dir = project_root
+)
+
+library(readxl)
+library(knitr)
+
+chart_path = function(filename) {
+  normalizePath(
+    file.path(
+      project_root,
+      "06_Charts",
+      "R",
+      filename
+    ),
+    winslash = "/",
+    mustWork = TRUE
+  )
+}
+```
+
+# Task 9 Overview
+
+Task 9 critically evaluates whether **time series analysis** is appropriate for the Fragceylon retail product demand dataset.
+
+The assignment requires discussion of:
+
+- trend;
+- seasonality;
+- forecasting;
+- ARIMA;
+- organizational applications and benefits.
+
+A full production time-series model is **not required**.
+
+Therefore, the objective is not to force ARIMA or SARIMA onto a short historical series. Instead, this section evaluates whether the available history is sufficiently long, stable and comparable for dependable time-series modelling.
+
+The evaluation uses:
+
+1. historical-span analysis;
+2. structural-regime assessment;
+3. monthly demand aggregation;
+4. calendar-coverage checks;
+5. exploratory trend analysis;
+6. exploratory autocorrelation analysis;
+7. seasonality-readiness assessment;
+8. weekly versus monthly aggregation comparison;
+9. product-level time-series readiness;
+10. ARIMA/SARIMA applicability discussion.
+
+---
+
+# 1. Load the Regular-Order Dataset
+
+```{r load-data}
+regular_orders = read_excel(
+  "04_Cleaned_Data/Fragceylon_Regular_Orders.xlsx"
+)
+
+regular_orders$Date = as.Date(
+  regular_orders$Date
+)
+
+dim(
+  regular_orders
+)
+
+range(
+  regular_orders$Date
+)
+```
+
+The Regular Order dataset contains:
+
+- **3,116 observations**
+- **4 perfume products**
+- sales history from **18 October 2024 to 30 June 2026**
+
+---
+
+# 2. Historical Span
+
+```{r history-summary}
+history_summary = read.csv(
+  "08_Model_Results/R/Task9_Historical_Span_Summary.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  history_summary,
+  caption = "Historical Span Summary"
+)
+```
+
+The full Regular Order history contains approximately:
+
+```text
+621 calendar days
+≈ 1.70 years
+```
+
+However, the full historical span cannot automatically be treated as one stable time series because the business structure changes sharply on **1 April 2025**.
+
+---
+
+# 3. Structural Regime Change
+
+```{r regime-structure}
+regime_structure = read.csv(
+  "08_Model_Results/R/Task9_Regime_Channel_Structure.csv",
+  row.names = 1,
+  check.names = FALSE
+)
+
+kable(
+  regime_structure,
+  caption = "Channel Structure Before and After 1 April 2025"
+)
+```
+
+The channel structure changes completely:
+
+```text
+Before 2025-04-01
+Main Dealer       0
+Shop            751
+Small Dealer    351
+
+2025-04-01 onward
+Main Dealer    2014
+Shop              0
+Small Dealer      0
+```
+
+This is a major structural break in the business process.
+
+A time-series model fitted across the whole period could confuse:
+
+- changes in sales channel;
+- changes in order size;
+- changes in customer structure;
+
+with a genuine trend or seasonal pattern.
+
+Therefore, the post-April-2025 period is treated as the more comparable current regime.
+
+---
+
+# 4. Monthly Demand Series
+
+```{r monthly-demand}
+monthly_demand = read.csv(
+  "08_Model_Results/R/Task9_Monthly_Total_Demand.csv",
+  stringsAsFactors = FALSE
+)
+
+monthly_demand$Month_Start = as.Date(
+  monthly_demand$Month_Start
+)
+
+kable(
+  monthly_demand,
+  caption = "Monthly Regular-Order Demand"
+)
+```
+
+The full dataset contains **21 monthly observations**.
+
+Monthly demand varies substantially across the period.
+
+This variability may reflect:
+
+- actual demand changes;
+- changes in order timing;
+- dealer purchasing patterns;
+- the structural channel change;
+- possible seasonality;
+- other business factors not recorded in the current dataset.
+
+Therefore, visual fluctuations should not automatically be interpreted as recurring seasonal effects.
+
+---
+
+# 5. Monthly Demand and Regime Change
+
+```{r regime-chart, echo=FALSE, out.width="90%"}
+knitr::include_graphics(
+  chart_path(
+    "Task9_01_Monthly_Demand_Regime_Change.png"
+  )
+)
+```
+
+The vertical reference line marks the start of the Main Dealer regime.
+
+The substantial difference between the pre-April-2025 period and the later period reinforces the need to avoid treating the entire history as a homogeneous time series.
+
+---
+
+# 6. Calendar Coverage
+
+```{r calendar-coverage}
+calendar_coverage = read.csv(
+  "08_Model_Results/R/Task9_Monthly_Calendar_Coverage.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  calendar_coverage,
+  digits = 2,
+  caption = "Monthly Calendar Coverage"
+)
+```
+
+October 2024 is only a partial month:
+
+```text
+Observed days: 14 of 31
+Coverage: approximately 45.16%
+```
+
+All later months are complete calendar months.
+
+This matters because a partial month should not be compared directly with a complete month when evaluating trend or seasonality.
+
+---
+
+# 7. Current Stable Regime
+
+The current Main Dealer regime contains:
+
+```text
+April 2025 to June 2026
+15 monthly observations
+```
+
+This is approximately:
+
+```text
+1.25 years
+```
+
+of comparable monthly history.
+
+That is the most important limitation for time-series modelling in this project.
+
+---
+
+# 8. Seasonality Requires Repeated Comparable Cycles
+
+Annual seasonality means that similar effects repeat at roughly the same time each year.
+
+For monthly data, reliable seasonal analysis requires repeated observations of the same calendar months across comparable years.
+
+```{r month-replication}
+month_replication = read.csv(
+  "08_Model_Results/R/Task9_Current_Regime_Month_Replication.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  month_replication,
+  caption = "Current-Regime Month-of-Year Replication"
+)
+```
+
+Only:
+
+- April;
+- May;
+- June;
+
+appear twice in the current regime.
+
+Every other calendar month appears only once.
+
+Therefore, the current data do not provide repeated evidence for most annual months.
+
+---
+
+# 9. Direct 12-Month Comparisons
+
+```{r lag12}
+lag12 = read.csv(
+  "08_Model_Results/R/Task9_Current_Regime_Lag12_Comparisons.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  lag12,
+  caption = "Direct Same-Month Comparisons 12 Months Apart"
+)
+```
+
+Only three direct annual comparisons are available:
+
+```text
+April 2025 → April 2026   +4,334
+May 2025   → May 2026     -1,347
+June 2025  → June 2026    +5,515
+```
+
+These differences are not consistent enough, and the sample is too small, to establish a dependable yearly seasonal pattern.
+
+Therefore:
+
+> **Annual seasonality is not established by the current Fragceylon data.**
+
+---
+
+# 10. Exploratory Trend Analysis
+
+A simple linear trend was fitted to the 15 current-regime monthly totals.
+
+This is a descriptive diagnostic only.
+
+It is not a production forecasting model.
+
+```{r trend-table}
+trend_assessment = read.csv(
+  "08_Model_Results/R/Task9_Current_Regime_Trend_Assessment.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  trend_assessment,
+  digits = 4,
+  caption = "Exploratory Current-Regime Trend Assessment"
+)
+```
+
+The estimated monthly trend is approximately:
+
+```text
++1,244.94 units per month
+```
+
+However:
+
+```text
+p-value = 0.6503
+95% CI = -4,550.42 to 7,040.30
+R-squared = 0.0163
+```
+
+The interval includes zero by a wide margin and the model explains very little of the monthly variation.
+
+Therefore, there is **no convincing evidence of a linear monthly trend** in the current stable regime.
+
+---
+
+# 11. Current-Regime Monthly Trend Chart
+
+```{r trend-chart, echo=FALSE, out.width="90%"}
+knitr::include_graphics(
+  chart_path(
+    "Task9_02_Current_Regime_Monthly_Trend.png"
+  )
+)
+```
+
+The fitted trend line is weak relative to the large month-to-month fluctuations.
+
+A positive fitted slope should therefore not be interpreted as proven demand growth.
+
+---
+
+# 12. Autocorrelation
+
+Time-series models such as ARIMA use temporal dependence in past observations.
+
+An exploratory autocorrelation function was therefore calculated.
+
+```{r acf-table}
+acf_table = read.csv(
+  "08_Model_Results/R/Task9_Current_Regime_ACF.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  acf_table,
+  digits = 4,
+  caption = "Exploratory ACF of Current-Regime Monthly Demand"
+)
+```
+
+Selected values include approximately:
+
+```text
+Lag 1   =  0.243
+Lag 5   = -0.349
+Lag 6   = -0.400
+Lag 12  =  0.221
+```
+
+These values should be interpreted very cautiously because the stable monthly series contains only 15 observations.
+
+A lag-12 autocorrelation based on such a short series is not sufficient evidence of annual seasonality.
+
+---
+
+# 13. Exploratory ACF Plot
+
+```{r acf-chart, echo=FALSE, out.width="85%"}
+knitr::include_graphics(
+  chart_path(
+    "Task9_04_Current_Regime_ACF.png"
+  )
+)
+```
+
+The ACF is included as an exploratory diagnostic only.
+
+It should **not** be used to select a production ARIMA order from the current dataset.
+
+---
+
+# 14. Why ARIMA Is Not Fitted as a Final Model
+
+ARIMA models can be useful when a series contains enough information to estimate:
+
+- autoregressive structure;
+- differencing requirements;
+- moving-average structure;
+- residual behaviour.
+
+The current monthly series has only **15 comparable observations**.
+
+This is too little history to confidently distinguish genuine temporal structure from random monthly variation.
+
+Therefore, fitting an ARIMA model merely because ARIMA appears in the assignment would create a false sense of precision.
+
+---
+
+# 15. Why SARIMA Is Even More Difficult to Justify
+
+SARIMA extends ARIMA with seasonal components.
+
+For monthly retail data, annual seasonality would normally use a seasonal period of 12.
+
+The current comparable history provides only:
+
+```text
+15 months
+≈ 1.25 annual cycles
+```
+
+This is not enough repeated seasonal information for dependable estimation of annual seasonal parameters.
+
+A SARIMA model may become useful later, but it is not well supported by the current evidence.
+
+---
+
+# 16. Product-Level Demand
+
+Time-series forecasting may eventually be more useful at individual perfume level because different products may show different demand patterns.
+
+```{r product-coverage}
+product_coverage = read.csv(
+  "08_Model_Results/R/Task9_Product_Monthly_Coverage.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  product_coverage,
+  caption = "Product-Level Current-Regime Monthly Coverage"
+)
+```
+
+Each perfume has only **15 current-regime monthly observations**.
+
+Therefore, splitting the total series by perfume improves business relevance but reduces the effective amount of information available for each model.
+
+---
+
+# 17. Monthly Demand by Perfume
+
+```{r product-chart, echo=FALSE, out.width="95%"}
+knitr::include_graphics(
+  chart_path(
+    "Task9_03_Product_Monthly_Demand.png"
+  )
+)
+```
+
+The four product series show substantial variation.
+
+This supports future product-level modelling, but the current time span remains too short to confidently separate:
+
+- product trend;
+- annual seasonality;
+- irregular dealer ordering;
+- one-off demand spikes.
+
+---
+
+# 18. Weekly Versus Monthly Aggregation
+
+A possible response to the short monthly series is to aggregate sales weekly.
+
+This produces more observations.
+
+```{r aggregation-comparison}
+aggregation_comparison = read.csv(
+  "08_Model_Results/R/Task9_Aggregation_Frequency_Comparison.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  aggregation_comparison,
+  digits = 4,
+  caption = "Monthly and Weekly Aggregation Comparison"
+)
+```
+
+The comparison is:
+
+| Aggregation | Observations | Approximate seasonal cycles |
+|---|---:|---:|
+| Monthly - full history | 21 | 1.75 |
+| Monthly - current regime | 15 | 1.25 |
+| Weekly - full history | 90 | 1.73 |
+| Weekly - current regime | 65 | 1.25 |
+
+Weekly aggregation provides more individual observations.
+
+However, it does **not create additional years of history**.
+
+A 52-week annual cycle still contains only about 1.25 comparable cycles in the current regime.
+
+Therefore, weekly data do not solve the central seasonality limitation.
+
+---
+
+# 19. Advantages of Monthly Aggregation
+
+Monthly aggregation has several benefits:
+
+- easier communication to management;
+- alignment with purchasing and inventory planning;
+- lower short-term noise than daily or weekly sales;
+- clear comparison with month-based business reporting.
+
+Its main current limitation is the very small number of observations.
+
+---
+
+# 20. Advantages and Limitations of Weekly Aggregation
+
+Weekly aggregation provides more observations and may support short-horizon operational forecasting.
+
+However, it may also introduce:
+
+- greater short-term volatility;
+- irregular ordering effects;
+- week-boundary effects;
+- stronger sensitivity to delivery schedules;
+- incomplete weekly periods.
+
+For annual seasonality, multiple years are still required.
+
+---
+
+# 21. Time-Series Applicability Assessment
+
+```{r applicability}
+time_series_applicability = read.csv(
+  "08_Model_Results/R/Task9_Time_Series_Applicability.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  time_series_applicability,
+  caption = "Time-Series Method Applicability Assessment"
+)
+```
+
+The current evidence supports the following interpretation:
+
+- trend analysis is possible descriptively;
+- annual seasonality is weakly supported;
+- short-horizon exploratory forecasting may be possible;
+- ARIMA is a future option after more stable history is collected;
+- SARIMA should wait until repeated annual cycles exist;
+- product-level forecasting is potentially useful but currently data-limited.
+
+---
+
+# 22. Future ARIMA Framework
+
+Once a longer stable history has been collected, a monthly series could be created as:
+
+```{r future-arima-template, eval=FALSE}
+monthly_ts = ts(
+  future_monthly_data$Quantity,
+  frequency = 12,
+  start = c(2027, 1)
+)
+```
+
+A non-seasonal ARIMA model could then be investigated using:
+
+```{r future-arima-model, eval=FALSE}
+fit_arima = arima(
+  monthly_ts,
+  order = c(p, d, q)
+)
+```
+
+The values of `p`, `d`, and `q` should be selected using appropriate diagnostics and forecast validation rather than guessed in advance.
+
+---
+
+# 23. Future SARIMA Framework
+
+If repeated annual seasonality becomes evident, a seasonal model could be considered:
+
+```{r future-sarima-model, eval=FALSE}
+fit_sarima = arima(
+  monthly_ts,
+  order = c(p, d, q),
+  seasonal = list(
+    order = c(P, D, Q),
+    period = 12
+  )
+)
+```
+
+A SARIMA model should only be used if the future dataset provides enough repeated seasonal cycles to estimate and validate the seasonal structure.
+
+---
+
+# 24. Residual Diagnostics for Future Models
+
+Any future ARIMA/SARIMA model should be checked using residual diagnostics.
+
+For example:
+
+```{r future-diagnostics, eval=FALSE}
+acf(
+  residuals(
+    fit_arima
+  )
+)
+
+Box.test(
+  residuals(
+    fit_arima
+  ),
+  lag = appropriate_lag,
+  type = "Ljung-Box"
+)
+```
+
+A forecast model should not be accepted merely because it fits the historical observations.
+
+Residual behaviour and out-of-sample forecasting performance must also be checked.
+
+---
+
+# 25. Forecast Evaluation
+
+Forecasting differs from ordinary random-split prediction because temporal order matters.
+
+Future observations must remain genuinely in the future during evaluation.
+
+A suitable future approach is:
+
+- rolling-origin evaluation;
+- expanding-window evaluation;
+- repeated future holdout periods.
+
+Randomly shuffling observations would destroy the time structure.
+
+---
+
+# 26. Future Data Requirements
+
+```{r future-requirements}
+future_requirements = read.csv(
+  "08_Model_Results/R/Task9_Future_Time_Series_Data_Requirements.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  future_requirements,
+  caption = "Future Data Requirements for Time-Series Forecasting"
+)
+```
+
+Important additions include:
+
+- longer stable history;
+- consistent channel structure;
+- complete time coverage;
+- stock-out indicators;
+- inventory-on-hand data;
+- promotion information;
+- price history;
+- product-level series;
+- market-level series;
+- forecast-validation protocols.
+
+---
+
+# 27. Why Stock Availability Matters
+
+Observed sales are not always identical to true demand.
+
+If a product is unavailable, recorded sales may fall even when customer demand remains high.
+
+Without stock-out information, a forecasting model could incorrectly interpret:
+
+```text
+low observed sales
+```
+
+as:
+
+```text
+low market demand
+```
+
+Therefore, future demand forecasting should include inventory and stock-availability information where possible.
+
+---
+
+# 28. Why Promotion and Price Data Matter
+
+Temporary promotions or pricing changes can generate sales spikes.
+
+If these variables are not recorded, a time-series model may incorrectly treat one-off promotional effects as:
+
+- trend;
+- seasonality;
+- recurring demand.
+
+Future forecasting should therefore preserve explanatory business variables where available.
+
+---
+
+# 29. Organizational Applications of Future Time-Series Forecasting
+
+With a longer stable history, time-series forecasting could support:
+
+## Inventory planning
+
+Forecasts could help determine expected product demand before stock decisions are made.
+
+## Purchasing and production planning
+
+Product-level forecasts could support order quantities and replenishment schedules.
+
+## Seasonal preparation
+
+If future data reveal repeatable seasonal peaks, management could prepare inventory before those periods.
+
+## Dealer planning
+
+Dealer demand could be forecast over short horizons to support allocation and delivery scheduling.
+
+## Cash-flow planning
+
+More accurate expectations of future order quantities could improve purchasing and working-capital planning.
+
+---
+
+# 30. Potential Benefits to Fragceylon
+
+A mature time-series forecasting system could provide:
+
+- earlier warning of demand changes;
+- more systematic inventory planning;
+- reduced emergency replenishment;
+- better seasonal preparation;
+- improved product-level planning;
+- more disciplined forecast evaluation;
+- explicit forecast uncertainty.
+
+However, these benefits depend on data quality and history length.
+
+A complex forecast model does not compensate for insufficient or structurally inconsistent data.
+
+---
+
+# 31. Research Literature Support
+
+The methodological conclusions in this task are supported by established and recent forecasting research.
+
+Hyndman and Athanasopoulos (2021) emphasize understanding the patterns and characteristics of a time series before attempting forecasting models. This supports the decision to examine Fragceylon's regime structure, calendar coverage, trend and seasonality before fitting ARIMA or SARIMA.
+
+Cerqueira, Torgo and Mozetič (2020) show that time-series performance estimation must respect temporal dependence, and that out-of-sample approaches are particularly relevant when non-stationary behaviour is present. This supports the recommendation to use future holdouts or rolling-origin evaluation rather than random cross-validation.
+
+Retail forecasting evidence from the M5 Competition also shows that real retail sales forecasting involves many correlated series, uncertainty and explanatory variables rather than only a single isolated sales sequence (Makridakis, Spiliotis and Assimakopoulos, 2022). The Fragceylon recommendation to retain product-level structure and collect explanatory variables such as promotions, price and inventory is therefore consistent with modern retail-forecasting practice.
+
+The M5 results also demonstrate that forecasting performance should be judged empirically on future observations rather than assuming that one model family will always be superior.
+
+---
+
+# 32. Critical Evaluation of Trend
+
+The current series does not provide convincing statistical evidence of a linear monthly trend.
+
+The estimated positive slope is small relative to its uncertainty:
+
+```text
+Slope = 1,244.94
+p = 0.6503
+95% CI includes zero
+R-squared = 0.0163
+```
+
+Therefore, the observed monthly variation should not be summarized as a confirmed growth trend.
+
+More stable history is required.
+
+---
+
+# 33. Critical Evaluation of Seasonality
+
+Annual seasonality is currently the weakest area for formal time-series modelling.
+
+The comparable regime includes only:
+
+```text
+15 monthly observations
+1.25 annual cycles
+3 direct year-over-year month comparisons
+```
+
+Most calendar months occur only once.
+
+Therefore, annual seasonal effects cannot currently be estimated or validated with confidence.
+
+This is the main reason SARIMA is not recommended at this stage.
+
+---
+
+# 34. Critical Evaluation of ARIMA
+
+ARIMA is conceptually relevant to future Fragceylon forecasting if:
+
+- sufficient stable history exists;
+- the series is appropriately transformed/differenced if needed;
+- temporal dependence can be estimated reliably;
+- residual diagnostics are satisfactory;
+- forecasts outperform simpler benchmarks on future observations.
+
+With only 15 comparable monthly observations, these conditions are not yet adequately supported.
+
+---
+
+# 35. Critical Evaluation of SARIMA
+
+SARIMA could become useful if clear annual seasonal patterns emerge over multiple years.
+
+At present:
+
+- annual replication is extremely limited;
+- the business regime changed substantially;
+- seasonal parameters would be estimated from very little repeated evidence.
+
+Therefore, fitting SARIMA now would risk over-interpreting noise as seasonality.
+
+---
+
+# 36. Current Recommendation
+
+The current dataset is useful for **descriptive temporal analysis**, but it is not yet strong enough for dependable production ARIMA/SARIMA forecasting.
+
+The preferred current approach is:
+
+1. continue using the validated Task 5 predictive models for immediate demand analysis;
+2. continue collecting consistent sales history;
+3. maintain the current channel-regime information;
+4. record inventory, stock-out, promotion and pricing variables;
+5. reassess time-series models after multiple comparable annual cycles are available;
+6. evaluate future forecasts using rolling-origin or future holdout testing.
+
+---
+
+# 37. Task 9 Final Evaluation
+
+Time-series methods have clear future business value for Fragceylon, but the current historical record imposes substantial limitations.
+
+The full data history covers only about **1.70 years**, while the comparable current Main Dealer regime covers only about **1.25 years**.
+
+The current regime contains only **15 monthly observations**.
+
+There is no convincing evidence of a linear monthly trend, with a trend p-value of approximately **0.6503**.
+
+Annual seasonality cannot be established because only April, May and June have repeated same-month observations in the current regime.
+
+Weekly aggregation increases the number of observations but does not increase the number of annual cycles.
+
+Therefore:
+
+- trend analysis is currently descriptive;
+- annual seasonality is not established;
+- ARIMA is a future possibility rather than a current production recommendation;
+- SARIMA is currently unsupported by sufficient seasonal history;
+- product-level forecasting may become valuable with additional data;
+- future time-series modelling should use genuine out-of-sample temporal validation.
+
+---
+
+# 38. References
+
+Cerqueira, V., Torgo, L., & Mozetič, I. (2020). *Evaluating time series forecasting models: An empirical study on performance estimation methods*. Machine Learning, 109, 1997-2028. https://doi.org/10.1007/s10994-020-05910-7
+
+Hyndman, R. J., & Athanasopoulos, G. (2021). *Forecasting: Principles and Practice* (3rd ed.). OTexts, Melbourne, Australia.
+
+Makridakis, S., Spiliotis, E., & Assimakopoulos, V. (2022). *M5 accuracy competition: Results, findings, and conclusions*. International Journal of Forecasting, 38(4), 1346-1364. https://doi.org/10.1016/j.ijforecast.2021.11.013
+
+Makridakis, S., Spiliotis, E., & Assimakopoulos, V. (2022). *The M5 competition: Background, organization, and implementation*. International Journal of Forecasting, 38(4), 1325-1336. https://doi.org/10.1016/j.ijforecast.2021.07.007
+
+---
+
+# Appendix A - Monthly Demand
+
+```{r appendix-monthly}
+kable(
+  monthly_demand,
+  caption = "Full Monthly Demand Table"
+)
+```
+
+# Appendix B - Trend Assessment
+
+```{r appendix-trend}
+kable(
+  trend_assessment,
+  digits = 4,
+  caption = "Full Current-Regime Trend Assessment"
+)
+```
+
+# Appendix C - ACF Values
+
+```{r appendix-acf}
+kable(
+  acf_table,
+  digits = 4,
+  caption = "Full Exploratory ACF Table"
+)
+```
+
+# Appendix D - Task 9 Output Files
+
+```{r appendix-files}
+task9_results = list.files(
+  "08_Model_Results/R",
+  pattern = "^Task9",
+  full.names = FALSE
+)
+
+task9_results
+```

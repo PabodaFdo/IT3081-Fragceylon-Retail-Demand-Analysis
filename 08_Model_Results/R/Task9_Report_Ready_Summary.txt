@@ -1,0 +1,25 @@
+TASK 9 - CRITICAL EVALUATION OF TIME SERIES ANALYSIS
+
+CURRENT DATA HISTORY
+The full Regular Order history runs from 2024-10-18 to 2026-06-30, approximately 1.7 years. However, a major structural channel change occurred on 2025-04-01. The current stable Main Dealer regime therefore contains only 15 monthly observations from 2025-04-01 to 2026-06-01.
+
+TREND
+A simple current-regime monthly linear trend was estimated only as a descriptive diagnostic. It should not be treated as a production forecasting model because the series is short.
+
+Monthly trend coefficient: 1244.943
+Trend p-value: 0.6503
+
+SEASONALITY
+The current stable regime covers only about 1.25 years. This provides too few repeated annual cycles to support dependable conclusions about yearly seasonality. There are only 3 direct same-month comparisons separated by 12 months in the current regime.
+
+ARIMA / SARIMA
+ARIMA and SARIMA are conceptually relevant for future demand forecasting, but a dependable model should not be forced onto the current short, structurally changing history. SARIMA is especially difficult to justify because annual seasonal parameters require repeated comparable seasonal cycles.
+
+BUSINESS APPLICATION
+With a longer stable history, time-series forecasting could support product-level demand planning, seasonal preparation, purchasing schedules, dealer planning and short-horizon inventory decisions. Forecasts should be generated separately by perfume where sufficient data exist.
+
+DATA COLLECTION RECOMMENDATION
+Fragceylon should continue collecting consistent product-level sales data and add stock availability, stock-out indicators, promotion data, price history and inventory information. Future forecast validation should use rolling-origin or future holdout evaluation.
+
+LITERATURE REQUIREMENT
+The final Task 9 report section must support the discussion using recent verified literature. No references are fabricated by this R script.

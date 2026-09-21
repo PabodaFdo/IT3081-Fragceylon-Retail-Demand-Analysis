@@ -1,0 +1,5 @@
+"Aggregation","Observations","Approx_Seasonal_Period","Approx_Number_of_Seasonal_Cycles"
+"Monthly - full history",21,12,1.75
+"Monthly - current regime",15,12,1.25
+"Weekly - full history",90,52,1.73076923076923
+"Weekly - current regime",65,52,1.25
