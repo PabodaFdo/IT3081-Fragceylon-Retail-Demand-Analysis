@@ -1,0 +1,789 @@
+---
+title: "Task 6 - Critical Evaluation of Experimental Design"
+subtitle: "Retail Product Demand Analysis at Fragceylon"
+author: "IT3081 Statistical Modelling"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    code_folding: show
+    theme: cosmo
+    highlight: textmate
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 9,
+  fig.height = 6,
+  fig.align = "center"
+)
+
+options(scipen = 999)
+
+project_root = "C:/Users/saths/Desktop/Sliit/3rd year/3rd Year 1st sem/IT3081-SM/Project/IT3081-Fragceylon-Retail-Demand-Analysis"
+
+knitr::opts_knit$set(
+  root.dir = project_root
+)
+
+library(readxl)
+library(knitr)
+
+chart_path = function(filename) {
+  normalizePath(
+    file.path(
+      project_root,
+      "06_Charts",
+      "R",
+      filename
+    ),
+    winslash = "/",
+    mustWork = TRUE
+  )
+}
+```
+
+# Task 6 Overview
+
+Task 6 critically evaluates whether **experimental design methodologies** could improve future investigations of Fragceylon's retail product demand problem.
+
+The assignment does **not** require an actual experiment to be conducted. Therefore, this section does not claim any observed promotion effect and does not fabricate experimental outcomes.
+
+The evaluation focuses on:
+
+- Completely Randomized Design (CRD)
+- Randomized Complete Block Design (RCBD)
+- situations where each design may be useful;
+- expected advantages;
+- limitations;
+- implementation challenges;
+- practical feasibility for Fragceylon.
+
+The proposed business application is a future promotion experiment where different promotional strategies are compared using **Quantity Sold** as the primary response.
+
+---
+
+# 1. Historical Business Context
+
+## Why historical context matters
+
+A future experiment should be designed around Fragceylon's actual business structure rather than an abstract textbook example.
+
+The historical analysis showed:
+
+- four perfume products;
+- multiple sales channels in the earlier period;
+- a major structural change on 1 April 2025;
+- only Main Dealer transactions in the current regime;
+- Local and Japan-labelled transactions in the current regime;
+- substantial variation in transaction Quantity.
+
+These characteristics affect how experimental units and blocking variables should be defined.
+
+```{r historical-context}
+historical_context = read.csv(
+  "08_Model_Results/R/Task6_Historical_Context.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  historical_context,
+  caption = "Historical Context Relevant to Future Experimental Design"
+)
+```
+
+## Interpretation
+
+The historical dataset contains 3,116 Regular Orders across four products. The current-regime dataset contains 2,014 Regular Orders and only Main Dealer transactions.
+
+This matters because a future experiment should be conducted within a clearly defined operating regime. Mixing experimental units from incompatible business structures could create unnecessary variation and make treatment comparisons harder to interpret.
+
+---
+
+# 2. Proposed Future Business Question
+
+A practical future experimental question is:
+
+> **Do different promotion strategies change the quantity of perfume sold?**
+
+The proposed treatment factor is **Promotion Strategy**.
+
+The four illustrative treatment levels are:
+
+1. Control - No Promotion
+2. Discount
+3. Social Media Promotion
+4. Bundle Offer
+
+The proposed primary response is:
+
+> **Quantity Sold during a fixed and comparable experimental sales window**
+
+Possible secondary responses may include:
+
+- Revenue
+- Gross margin
+- Number of orders
+- Repeat purchases
+- Promotion cost
+- Stock-out occurrence
+
+However, secondary outcomes should only be used if they are recorded consistently during a real experiment.
+
+---
+
+# 3. Experimental Unit
+
+## Why the experimental unit must be defined carefully
+
+The experimental unit is the smallest independently randomized unit that receives a treatment.
+
+Possible units for Fragceylon include:
+
+- dealer-period;
+- store-period;
+- product-dealer-period;
+- comparable campaign-period;
+- another operational unit that can receive one promotion without contaminating another unit.
+
+A poorly defined experimental unit can create **pseudo-replication**, where multiple observations are treated as independent even though only one unit was randomized.
+
+For example, if one dealer receives a discount for one week and 20 individual transactions occur during that week, the dealer-week may be the real experimental unit rather than the 20 transactions.
+
+This should be decided before randomization.
+
+---
+
+# 4. Completely Randomized Design (CRD)
+
+## 4.1 What is CRD?
+
+In a Completely Randomized Design, all eligible experimental units are placed into one common pool and treatments are assigned randomly across those units.
+
+For Fragceylon, this could be appropriate if the experimental units are reasonably homogeneous before the experiment.
+
+## 4.2 Why CRD could be useful
+
+CRD is attractive because it is simple to organize and explain.
+
+It could be suitable when:
+
+- experimental units are sufficiently comparable;
+- product, dealer and market differences are small or already restricted;
+- the experiment is a small pilot;
+- each unit can receive any treatment;
+- treatment spillover can be controlled.
+
+## 4.3 Proposed CRD structure
+
+The planning script creates an illustrative balanced CRD with:
+
+- 32 experimental units;
+- 4 promotion treatments;
+- 8 units per treatment.
+
+```{r crd-randomization}
+crd_design = read.csv(
+  "08_Model_Results/R/Task6_CRD_Proposed_Randomization.csv",
+  stringsAsFactors = FALSE
+)
+
+head(
+  crd_design,
+  12
+)
+
+table(
+  crd_design$Assigned_Treatment
+)
+```
+
+## 4.4 Why randomization is important
+
+Randomization reduces systematic allocation bias.
+
+If management manually gives the discount to high-performing dealers and gives the control condition to low-performing dealers, any observed difference could reflect dealer quality rather than the promotion.
+
+Random treatment allocation helps separate treatment effects from pre-existing differences.
+
+## 4.5 CRD treatment allocation chart
+
+```{r crd-chart, echo=FALSE, out.width="85%"}
+knitr::include_graphics(
+  chart_path(
+    "Task6_01_CRD_Treatment_Allocation.png"
+  )
+)
+```
+
+## 4.6 CRD advantages
+
+CRD has several potential advantages for Fragceylon:
+
+- simple randomization process;
+- straightforward treatment comparison;
+- relatively easy implementation;
+- easy explanation to management;
+- supports causal inference if treatment assignment, implementation and outcome measurement are correctly controlled;
+- can work well when experimental units are homogeneous.
+
+## 4.7 CRD limitations
+
+CRD may be inefficient if important differences already exist between experimental units.
+
+For Fragceylon, possible sources of nuisance variation include:
+
+- product;
+- dealer;
+- market;
+- sales period;
+- customer base;
+- local versus export demand structure;
+- existing demand level;
+- stock availability.
+
+If these sources of variation are large, randomization alone may not balance them well in a small experiment.
+
+## 4.8 Practical risks with CRD
+
+Operational risks include:
+
+- treatment contamination;
+- customers learning about another group's promotion;
+- dealers changing behaviour because they know other treatments exist;
+- stock-outs affecting observed Quantity Sold;
+- promotions being implemented inconsistently;
+- discount treatments changing revenue or margin even if Quantity increases.
+
+Therefore, Quantity Sold should not be the only business consideration when management evaluates the outcome.
+
+---
+
+# 5. Randomized Complete Block Design (RCBD)
+
+## 5.1 What is RCBD?
+
+In a Randomized Complete Block Design, experimental units are first grouped into relatively homogeneous blocks.
+
+All treatments then appear once within each complete block, and treatment allocation is randomized within that block.
+
+The goal is to separate known background variation from the promotion effect.
+
+## 5.2 Why RCBD may be useful for Fragceylon
+
+Fragceylon's historical data show meaningful structural differences across products, channels, buyers, markets and time periods.
+
+A blocking approach may therefore be useful when one major nuisance factor can be defined before the experiment.
+
+Possible blocking variables include:
+
+- Product
+- Dealer
+- Market
+- Comparable time period
+- Baseline demand band
+
+Only one blocking structure should be chosen if it can be implemented clearly and consistently.
+
+## 5.3 Proposed RCBD illustration
+
+The planning script uses Product as the illustrative blocking dimension.
+
+It creates:
+
+- four product categories;
+- two illustrative replicate blocks per product;
+- eight total blocks;
+- four treatments in every block;
+- 32 total experimental units.
+
+```{r rcbd-randomization}
+rcbd_design = read.csv(
+  "08_Model_Results/R/Task6_RCBD_Proposed_Randomization.csv",
+  stringsAsFactors = FALSE
+)
+
+head(
+  rcbd_design,
+  16
+)
+
+table(
+  rcbd_design$Block_ID,
+  rcbd_design$Assigned_Treatment
+)
+```
+
+## 5.4 Why complete blocks matter
+
+A complete block contains every treatment.
+
+This enables promotion strategies to be compared after accounting for block-level differences.
+
+For example, if Dark Matrix naturally sells differently from Kennedy, treating Product as a block can prevent those baseline product differences from being mistaken for promotion effects.
+
+## 5.5 RCBD treatment-by-block chart
+
+```{r rcbd-chart, echo=FALSE, out.width="90%"}
+knitr::include_graphics(
+  chart_path(
+    "Task6_02_RCBD_Treatment_By_Block.png"
+  )
+)
+```
+
+## 5.6 RCBD advantages
+
+Potential benefits include:
+
+- controls one known source of nuisance variation;
+- may reduce residual variability;
+- can provide a more precise treatment comparison when blocks are meaningful;
+- improves balance with respect to the blocking factor;
+- is useful when experimental units are heterogeneous but can be grouped into internally similar blocks.
+
+## 5.7 RCBD limitations
+
+RCBD also has important limitations:
+
+- requires meaningful blocks;
+- all treatments must be feasible within every complete block;
+- design and scheduling are more complex than CRD;
+- incomplete or missing treatment implementation can damage the design;
+- using a weak blocking variable provides little benefit;
+- blocking on too many factors is not possible in a simple RCBD.
+
+## 5.8 Practical feasibility
+
+RCBD is potentially feasible for Fragceylon if management can identify repeated comparable units within each block.
+
+For example, if Product is used as the blocking factor, the business still needs several independently randomizable units inside each product block.
+
+The product name itself is **not** the experimental unit.
+
+This distinction is critical.
+
+---
+
+# 6. CRD vs RCBD Comparison
+
+```{r design-comparison}
+design_comparison = read.csv(
+  "08_Model_Results/R/Task6_CRD_vs_RCBD_Comparison.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  design_comparison,
+  caption = "Critical Comparison of CRD and RCBD"
+)
+```
+
+## Interpretation
+
+CRD is simpler and operationally easier when units are already reasonably comparable.
+
+RCBD may provide a more precise comparison when a known background factor creates substantial variation and can be represented by meaningful blocks.
+
+Therefore, RCBD should **not** automatically be described as superior to CRD.
+
+The appropriate design depends on:
+
+- the experimental unit;
+- the strength of nuisance variation;
+- available sample size;
+- treatment feasibility;
+- operational constraints;
+- spillover risk;
+- cost.
+
+---
+
+# 7. Proposed Implementation Checklist
+
+```{r implementation-checklist}
+implementation_checklist = read.csv(
+  "08_Model_Results/R/Task6_Implementation_Checklist.csv",
+  stringsAsFactors = FALSE
+)
+
+kable(
+  implementation_checklist,
+  caption = "Future Experimental Implementation Checklist"
+)
+```
+
+## Why this checklist is important
+
+A statistically valid randomization plan alone does not guarantee a valid business experiment.
+
+Implementation quality is equally important.
+
+Fragceylon should define in advance:
+
+- the unit being randomized;
+- the exact treatment conditions;
+- the duration of the response window;
+- treatment eligibility rules;
+- stock availability requirements;
+- how treatment compliance will be checked;
+- which contextual variables will be recorded;
+- how spillover between treatments will be minimized.
+
+---
+
+# 8. Treatment Contamination and Spillover
+
+Promotion experiments are especially vulnerable to contamination.
+
+Examples include:
+
+- the same customers seeing multiple promotion conditions;
+- one dealer informing another dealer about a discount;
+- a social-media promotion reaching customers assigned to the control group;
+- bundle-offer information spreading across channels.
+
+If contamination occurs, the treatment groups become less distinct and treatment-effect estimates may be biased toward each other.
+
+Therefore, treatment exposure should be designed around operational units where cross-treatment interference can be minimized.
+
+---
+
+# 9. Stock Availability as a Critical Experimental Variable
+
+A promotion can only increase observed sales if sufficient stock is available.
+
+Suppose the discount treatment generates high demand but a product becomes unavailable midway through the experiment.
+
+Observed Quantity Sold would then be limited by stock rather than true customer demand.
+
+Therefore, future experimental records should include:
+
+- starting stock;
+- stock replenishment;
+- stock-out periods;
+- promotion duration;
+- treatment compliance.
+
+This is especially important because the current historical dataset does not contain full inventory information.
+
+---
+
+# 10. Future Outcome Data Templates
+
+The script creates future data templates where experimental outcomes remain intentionally missing.
+
+```{r future-template}
+crd_future = read.csv(
+  "08_Model_Results/R/Task6_CRD_Future_Data_Template.csv",
+  stringsAsFactors = FALSE
+)
+
+rcbd_future = read.csv(
+  "08_Model_Results/R/Task6_RCBD_Future_Data_Template.csv",
+  stringsAsFactors = FALSE
+)
+
+head(
+  crd_future,
+  8
+)
+
+head(
+  rcbd_future,
+  8
+)
+```
+
+## Important interpretation
+
+`Quantity_Sold`, `Revenue_LKR`, and `Treatment_Compliance` are intentionally blank / missing because the experiment has not been conducted.
+
+No treatment-effect result can be calculated from the planning data.
+
+---
+
+# 11. How CRD Could Be Analysed in the Future
+
+If Fragceylon later conducts a real CRD experiment, a one-way ANOVA may be suitable when the assumptions are reasonably satisfied.
+
+The conceptual model would be:
+
+\[
+QuantitySold = TreatmentEffect + RandomError
+\]
+
+Example future R code:
+
+```{r future-crd-analysis, eval=FALSE}
+crd_results = read.csv(
+  "Task6_CRD_REAL_EXPERIMENT_RESULTS.csv"
+)
+
+crd_results$Assigned_Treatment = factor(
+  crd_results$Assigned_Treatment
+)
+
+crd_model = aov(
+  Quantity_Sold ~ Assigned_Treatment,
+  data = crd_results
+)
+
+summary(
+  crd_model
+)
+```
+
+This code should **not** be run using the planning template because no real response has been observed.
+
+---
+
+# 12. How RCBD Could Be Analysed in the Future
+
+For a real RCBD, the blocking factor would be included in the ANOVA model.
+
+Conceptually:
+
+\[
+QuantitySold = BlockEffect + TreatmentEffect + RandomError
+\]
+
+Example future R code:
+
+```{r future-rcbd-analysis, eval=FALSE}
+rcbd_results = read.csv(
+  "Task6_RCBD_REAL_EXPERIMENT_RESULTS.csv"
+)
+
+rcbd_results$Assigned_Treatment = factor(
+  rcbd_results$Assigned_Treatment
+)
+
+rcbd_results$Block_ID = factor(
+  rcbd_results$Block_ID
+)
+
+rcbd_model = aov(
+  Quantity_Sold ~
+    Block_ID +
+    Assigned_Treatment,
+  data = rcbd_results
+)
+
+summary(
+  rcbd_model
+)
+```
+
+Again, this is only a future analysis template.
+
+---
+
+# 13. Assumptions and Diagnostics for a Real Experiment
+
+If Fragceylon later conducts the experiment, the analysis should examine:
+
+- independence of experimental units;
+- correct randomization;
+- treatment implementation;
+- unusual or influential observations;
+- residual behaviour;
+- approximate normality of model errors where relevant;
+- homogeneity of variance;
+- missing outcome data;
+- stock-out effects;
+- treatment contamination.
+
+If assumptions are seriously violated, alternative models or robust methods may be required.
+
+---
+
+# 14. Sample Size and Statistical Power
+
+The 32-unit schedules generated in the R script are **illustrative planning examples only**.
+
+They are not a formal sample-size recommendation.
+
+Before a real experiment, Fragceylon should perform a power/sample-size analysis using:
+
+- the minimum business-relevant treatment effect;
+- historical variability;
+- desired significance level;
+- desired statistical power;
+- number of treatments;
+- blocking structure where relevant;
+- anticipated missing or non-compliant units.
+
+Without this step, the experiment may be too small to detect a practically important effect.
+
+---
+
+# 15. Practical Feasibility for Fragceylon
+
+A small pilot experiment appears conceptually feasible if the company can:
+
+- define independent experimental units;
+- allocate promotions randomly;
+- maintain sufficient stock;
+- prevent major treatment spillover;
+- deliver treatments consistently;
+- record compliance;
+- measure outcomes over the same time window;
+- collect contextual information.
+
+Potential operational challenges include:
+
+- discount cost;
+- reduced margin;
+- dealer resistance;
+- customer confusion;
+- unequal product availability;
+- campaign overlap;
+- staff coordination;
+- record-keeping burden;
+- treatment contamination.
+
+Therefore, a pilot should begin on a limited scale before a broader rollout.
+
+---
+
+# 16. Ethical and Business Considerations
+
+Although the experiment is low risk compared with medical or clinical experiments, business ethics still matter.
+
+Fragceylon should consider:
+
+- transparent promotion rules;
+- avoiding misleading advertising;
+- fair treatment of dealers/customers where appropriate;
+- customer data privacy;
+- avoiding hidden discriminatory targeting;
+- monitoring unintended commercial harm;
+- preserving normal customer service;
+- ensuring management oversight.
+
+A statistically efficient design is not useful if it creates unacceptable commercial or ethical consequences.
+
+---
+
+# 17. Overall Evaluation of CRD
+
+CRD is potentially appropriate when Fragceylon can identify sufficiently comparable experimental units and randomly allocate promotion conditions.
+
+Its main strength is simplicity.
+
+Its main weakness is that important product, dealer, market or timing variation may remain uncontrolled.
+
+Therefore, CRD is most suitable for a small pilot where unit comparability is strong and treatment contamination can be minimized.
+
+---
+
+# 18. Overall Evaluation of RCBD
+
+RCBD is potentially useful when Fragceylon can identify a clear nuisance factor that strongly influences Quantity Sold and can create complete blocks containing all treatments.
+
+Potential blocking variables include Product, Dealer, Market or comparable time periods.
+
+Its main advantage is improved control of known background variation.
+
+Its main challenge is operational complexity.
+
+RCBD is only useful when the chosen blocks are meaningful and when all treatments can be implemented within each block.
+
+---
+
+# 19. Practical Design Recommendation for Future Investigation
+
+For a future promotion study, Fragceylon should first define the experimental unit and examine how heterogeneous those units are.
+
+If units are reasonably homogeneous, a CRD pilot may be sufficient.
+
+If strong systematic differences exist across a clearly defined factor such as Product or Dealer, an RCBD should be considered to control that variation.
+
+The final decision between CRD and RCBD should therefore be based on the structure of the available experimental units rather than treating one design as universally superior.
+
+---
+
+# 20. Literature Support
+
+The assignment requires this Task 6 discussion to be supported by research literature.
+
+**Important:** No research-paper citations are fabricated in this R Markdown file.
+
+Before final submission, add verified literature from the project literature matrix to support points such as:
+
+- randomization and causal inference;
+- advantages and limitations of CRD;
+- efficiency gains from blocking;
+- RCBD assumptions;
+- experimental design in retail, marketing or promotion settings;
+- treatment contamination / interference;
+- sample-size and power planning.
+
+Use only papers that have been verified in the Task 2 literature review.
+
+A recommended literature-note structure is:
+
+```text
+Claim:
+CRD relies on random assignment and is most efficient when experimental units are reasonably homogeneous.
+
+Supporting paper:
+[Insert verified paper / textbook / journal source]
+
+Relevance to Fragceylon:
+Explain why the result supports or limits the proposed promotion experiment.
+```
+
+---
+
+# 21. Task 6 Final Conclusion
+
+Task 6 does not provide evidence that any promotion increases Fragceylon demand because no experiment has been conducted.
+
+Instead, it demonstrates how future experimental design could improve causal investigation.
+
+A **Completely Randomized Design** offers a simple approach when experimental units are sufficiently comparable.
+
+A **Randomized Complete Block Design** may be more suitable when an important source of nuisance variation such as Product, Dealer, Market or Time Period can be controlled through meaningful blocks.
+
+The strongest practical requirement is not simply choosing CRD or RCBD. Fragceylon must first define independent experimental units, control stock availability, prevent treatment contamination, randomize before observing outcomes, record treatment compliance and perform an appropriate sample-size analysis.
+
+---
+
+# Appendix - Task 6 Planning Outputs
+
+## CRD randomization schedule
+
+```{r appendix-crd}
+kable(
+  crd_design,
+  caption = "Illustrative Proposed CRD Randomization Schedule"
+)
+```
+
+## RCBD randomization schedule
+
+```{r appendix-rcbd}
+kable(
+  rcbd_design,
+  caption = "Illustrative Proposed RCBD Randomization Schedule"
+)
+```
+
+## All Task 6 result files
+
+```{r appendix-files}
+task6_results = list.files(
+  "08_Model_Results/R",
+  pattern = "^Task6",
+  full.names = FALSE
+)
+
+task6_results
+```

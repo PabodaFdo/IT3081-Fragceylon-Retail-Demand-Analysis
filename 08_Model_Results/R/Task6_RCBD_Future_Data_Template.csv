@@ -1,0 +1,33 @@
+"Block_ID","Product_Block","Replicate_Block","Unit_Within_Block","Assigned_Treatment","Quantity_Sold","Revenue_LKR","Treatment_Compliance"
+"Block_01","Dark Matrix",1,1,"Discount",NA,NA,NA
+"Block_01","Dark Matrix",1,2,"Control - No Promotion",NA,NA,NA
+"Block_01","Dark Matrix",1,3,"Social Media Promotion",NA,NA,NA
+"Block_01","Dark Matrix",1,4,"Bundle Offer",NA,NA,NA
+"Block_02","Kennedy",1,1,"Discount",NA,NA,NA
+"Block_02","Kennedy",1,2,"Control - No Promotion",NA,NA,NA
+"Block_02","Kennedy",1,3,"Bundle Offer",NA,NA,NA
+"Block_02","Kennedy",1,4,"Social Media Promotion",NA,NA,NA
+"Block_03","Mesmerose",1,1,"Control - No Promotion",NA,NA,NA
+"Block_03","Mesmerose",1,2,"Bundle Offer",NA,NA,NA
+"Block_03","Mesmerose",1,3,"Discount",NA,NA,NA
+"Block_03","Mesmerose",1,4,"Social Media Promotion",NA,NA,NA
+"Block_04","Secret Ambrosia",1,1,"Discount",NA,NA,NA
+"Block_04","Secret Ambrosia",1,2,"Social Media Promotion",NA,NA,NA
+"Block_04","Secret Ambrosia",1,3,"Control - No Promotion",NA,NA,NA
+"Block_04","Secret Ambrosia",1,4,"Bundle Offer",NA,NA,NA
+"Block_05","Dark Matrix",2,1,"Social Media Promotion",NA,NA,NA
+"Block_05","Dark Matrix",2,2,"Control - No Promotion",NA,NA,NA
+"Block_05","Dark Matrix",2,3,"Discount",NA,NA,NA
+"Block_05","Dark Matrix",2,4,"Bundle Offer",NA,NA,NA
+"Block_06","Kennedy",2,1,"Discount",NA,NA,NA
+"Block_06","Kennedy",2,2,"Control - No Promotion",NA,NA,NA
+"Block_06","Kennedy",2,3,"Social Media Promotion",NA,NA,NA
+"Block_06","Kennedy",2,4,"Bundle Offer",NA,NA,NA
+"Block_07","Mesmerose",2,1,"Control - No Promotion",NA,NA,NA
+"Block_07","Mesmerose",2,2,"Social Media Promotion",NA,NA,NA
+"Block_07","Mesmerose",2,3,"Discount",NA,NA,NA
+"Block_07","Mesmerose",2,4,"Bundle Offer",NA,NA,NA
+"Block_08","Secret Ambrosia",2,1,"Social Media Promotion",NA,NA,NA
+"Block_08","Secret Ambrosia",2,2,"Bundle Offer",NA,NA,NA
+"Block_08","Secret Ambrosia",2,3,"Control - No Promotion",NA,NA,NA
+"Block_08","Secret Ambrosia",2,4,"Discount",NA,NA,NA
