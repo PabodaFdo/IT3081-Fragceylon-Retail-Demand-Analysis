@@ -47,6 +47,34 @@ Test R-squared: 0.3987
 Test MAE improvement over baseline: 14.75 %
 Test RMSE improvement over baseline: 22.65 %
 
+GENERALIZATION / OVERFITTING CHECK
+Training MAE: 119.4688 
+Testing MAE: 116.8403 
+Training RMSE: 140.8005 
+Testing RMSE: 137.9482 
+Interpretation: chronological training and future-holdout errors are compared to assess generalization; this comparison does not by itself prove complete absence of overfitting.
+
+HOLDOUT PERFORMANCE BY MARKET
+  Export_Market   N Test_Share_Percent Mean_Actual_Quantity Mean_Predicted_Quantity      MAE     RMSE
+1         Local 374          90.120482             281.3021                277.7821 112.5384 129.8188
+2         Japan  41           9.879518             663.7561                609.5784 156.0825 197.1958
+Interpretation: these subgroup metrics are used to assess whether overall model performance hides materially different error across Local and Japan transactions. The Japan subgroup is smaller, so its metrics should be interpreted with its sample size.
+
+HOLDOUT PERFORMANCE BY PRODUCT
+     Product_Name   N Test_Share_Percent Mean_Actual_Quantity Mean_Predicted_Quantity      MAE     RMSE
+1     Dark Matrix  93           22.40964             317.6129                310.5247 117.5334 137.1323
+2         Kennedy 118           28.43373             309.7542                308.3861 105.8468 128.4289
+3       Mesmerose 125           30.12048             306.6000                300.0636 115.9054 134.3763
+4 Secret Ambrosia  79           19.03614             354.5190                330.4675 133.9244 156.9094
+Interpretation: product-level holdout metrics assess whether aggregate predictive performance is broadly consistent across the four perfumes.
+
+FINAL MODEL DIAGNOSTICS
+                                   Diagnostic  Statistic      p_value
+1                  Jarque-Bera normality test  36.926815 9.581732e-09
+2       Breusch-Pagan heteroscedasticity test 236.601189 3.542003e-45
+3 Durbin-Watson residual autocorrelation test   2.036014 5.493525e-01
+Durbin-Watson is treated as an exploratory sequential-residual diagnostic; repeated buyer activity remains a separate independence limitation.
+
 ROBUST INFERENCE
 HC3 heteroscedasticity-robust standard errors were used for coefficient uncertainty because the Breusch-Pagan diagnostic indicated unequal residual variance.
 The Japan coefficient is large and positive in the selected model, but it must be interpreted as an association rather than a causal market effect because Japan transactions are structurally concentrated within one buyer and the Main Dealer/post-April regime.

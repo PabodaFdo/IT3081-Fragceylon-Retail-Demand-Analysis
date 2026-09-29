@@ -383,31 +383,244 @@ summary(reduced_mlr)
 
 ## 8.6 VIF check
 
+The final Task 5 R script checks VIF at the encoded dummy-variable level so that the result is easy to interpret for each coefficient.
+
 ```{r vif}
-vif(reduced_mlr)
+calculate_column_vif = function(model) {
+
+  X = model.matrix(model)
+  X = X[
+    ,
+    colnames(X) != "(Intercept)",
+    drop = FALSE
+  ]
+
+  vif_values = numeric(
+    ncol(X)
+  )
+
+  for(i in 1:ncol(X)) {
+
+    y_col = X[, i]
+    x_other = X[, -i, drop = FALSE]
+
+    temp_model = lm(
+      y_col ~ x_other
+    )
+
+    r2_temp =
+      summary(temp_model)$r.squared
+
+    vif_values[i] =
+      1 / (1 - r2_temp)
+  }
+
+  result = data.frame(
+    Variable = colnames(X),
+    VIF = vif_values,
+    stringsAsFactors = FALSE
+  )
+
+  result = result[
+    order(result$VIF, decreasing = TRUE),
+  ]
+
+  rownames(result) = NULL
+
+  return(result)
+}
+
+final_vif =
+  calculate_column_vif(
+    reduced_mlr
+  )
+
+kable(
+  final_vif,
+  digits = 4,
+  caption = "Final Reduced MLR VIF"
+)
+
+write.csv(
+  final_vif,
+  "08_Model_Results/R/Task5_Final_MLR_VIF.csv",
+  row.names = FALSE
+)
 ```
 
-**Interpretation:** The reduced model has low multicollinearity compared with the initial specification.
+**Project result:** the maximum individual-dummy VIF is approximately **1.76**, so the reduced specification does not show concerning multicollinearity.
 
 ## 8.7 HC3 robust inference
 
-Residual heteroscedasticity remains present. HC3 robust standard errors are therefore used for coefficient inference.
+Residual heteroscedasticity remains present. HC3 robust standard errors are therefore used for coefficient inference. HC3 changes coefficient uncertainty; it does **not** change fitted coefficients or predictions.
 
 ```{r hc3}
-coeftest(
-  reduced_mlr,
-  vcov = vcovHC(
+hc3_cov =
+  vcovHC(
     reduced_mlr,
     type = "HC3"
   )
+
+hc3_result =
+  coeftest(
+    reduced_mlr,
+    vcov. = hc3_cov
+  )
+
+hc3_df =
+  df.residual(
+    reduced_mlr
+  )
+
+hc3_critical =
+  qt(
+    0.975,
+    df = hc3_df
+  )
+
+final_hc3_table = data.frame(
+  Variable =
+    rownames(hc3_result),
+  Coefficient =
+    hc3_result[, 1],
+  HC3_SE =
+    hc3_result[, 2],
+  t_value =
+    hc3_result[, 3],
+  p_value =
+    hc3_result[, 4],
+  CI_2.5 =
+    hc3_result[, 1] -
+    hc3_critical *
+    hc3_result[, 2],
+  CI_97.5 =
+    hc3_result[, 1] +
+    hc3_critical *
+    hc3_result[, 2],
+  row.names = NULL,
+  stringsAsFactors = FALSE
+)
+
+kable(
+  final_hc3_table,
+  digits = 4,
+  caption = "Final Reduced MLR Coefficients with HC3 Robust Inference"
+)
+
+write.csv(
+  final_hc3_table,
+  "08_Model_Results/R/Task5_Final_MLR_HC3_Coefficients.csv",
+  row.names = FALSE
 )
 ```
+
+The reference categories are:
+
+- Product = **Dark Matrix**
+- Export Market = **Local**
+- Day of Week = **Monday**
+
+The large positive Japan coefficient is interpreted as a historical association within the current modelling structure, not as a causal market effect.
 
 ## 8.8 MLR diagnostic tests
 
 ```{r mlr-diagnostics}
-bptest(reduced_mlr)
-dwtest(reduced_mlr)
+final_residuals =
+  residuals(
+    reduced_mlr
+  )
+
+final_residual_n =
+  length(
+    final_residuals
+  )
+
+final_jb_skew =
+  mean(
+    (
+      final_residuals -
+      mean(final_residuals)
+    )^3
+  ) /
+  mean(
+    (
+      final_residuals -
+      mean(final_residuals)
+    )^2
+  )^(3 / 2)
+
+final_jb_kurt =
+  mean(
+    (
+      final_residuals -
+      mean(final_residuals)
+    )^4
+  ) /
+  mean(
+    (
+      final_residuals -
+      mean(final_residuals)
+    )^2
+  )^2
+
+final_jb_stat =
+  final_residual_n / 6 *
+  (
+    final_jb_skew^2 +
+    (
+      (final_jb_kurt - 3)^2
+    ) / 4
+  )
+
+final_jb_p =
+  pchisq(
+    final_jb_stat,
+    df = 2,
+    lower.tail = FALSE
+  )
+
+bp_final =
+  bptest(
+    reduced_mlr
+  )
+
+# Two-sided Durbin-Watson is used as an exploratory sequential-residual check.
+dw_final =
+  dwtest(
+    reduced_mlr,
+    alternative = "two.sided"
+  )
+
+final_diagnostics_table = data.frame(
+  Diagnostic = c(
+    "Jarque-Bera normality test",
+    "Breusch-Pagan heteroscedasticity test",
+    "Durbin-Watson residual autocorrelation test"
+  ),
+  Statistic = c(
+    final_jb_stat,
+    unname(bp_final$statistic),
+    unname(dw_final$statistic)
+  ),
+  p_value = c(
+    final_jb_p,
+    bp_final$p.value,
+    dw_final$p.value
+  ),
+  stringsAsFactors = FALSE
+)
+
+kable(
+  final_diagnostics_table,
+  digits = 6,
+  caption = "Final Reduced MLR Diagnostic Tests"
+)
+
+write.csv(
+  final_diagnostics_table,
+  "08_Model_Results/R/Task5_Final_MLR_Diagnostics.csv",
+  row.names = FALSE
+)
 
 par(mfrow = c(1, 2))
 
@@ -419,7 +632,10 @@ plot(
   ylab = "Residuals"
 )
 
-abline(h = 0, lty = 2)
+abline(
+  h = 0,
+  lty = 2
+)
 
 qqnorm(
   residuals(reduced_mlr),
@@ -433,9 +649,16 @@ qqline(
 par(mfrow = c(1, 1))
 ```
 
-**Interpretation:** Heteroscedasticity is present, so ordinary coefficient standard errors are not relied upon. HC3 robust standard errors are used for inference. Predictive evaluation is still performed on the unseen future holdout set.
+**Project diagnostic results:**
 
-## 8.9 MLR holdout performance
+- Jarque-Bera = approximately **36.93**, p < 0.001: residual normality is imperfect.
+- Breusch-Pagan = approximately **236.60**, p < 0.001: strong heteroscedasticity is present.
+- Durbin-Watson = approximately **2.036**, p ≈ **0.549**: this diagnostic does not show evidence of first-order residual autocorrelation in the ordered training records.
+- Maximum individual-dummy VIF ≈ **1.76**: no concerning multicollinearity is indicated.
+
+HC3 robust standard errors are therefore used for coefficient inference. Durbin-Watson is treated as an exploratory sequential-residual diagnostic; repeated activity from the same buyers remains a separate independence limitation.
+
+## 8.9 MLR train and holdout performance
 
 ```{r mlr-performance}
 mlr_train_pred = predict(
@@ -458,17 +681,215 @@ mlr_test_metrics = regression_metrics(
   mlr_test_pred
 )
 
-mlr_train_metrics
-mlr_test_metrics
+mlr_performance = data.frame(
+  Dataset = c(
+    "Training",
+    "Testing"
+  ),
+  MAE = c(
+    mlr_train_metrics["MAE"],
+    mlr_test_metrics["MAE"]
+  ),
+  RMSE = c(
+    mlr_train_metrics["RMSE"],
+    mlr_test_metrics["RMSE"]
+  ),
+  R2 = c(
+    mlr_train_metrics["R2"],
+    mlr_test_metrics["R2"]
+  ),
+  row.names = NULL
+)
+
+kable(
+  mlr_performance,
+  digits = 4,
+  caption = "Reduced MLR Training and Future-Holdout Performance"
+)
 ```
 
-**Project test result:**
+**Project result:**
 
-- MAE ≈ **116.84**
-- RMSE ≈ **137.95**
-- R-squared ≈ **0.3987**
+- Training MAE ≈ **119.47**
+- Training RMSE ≈ **140.80**
+- Test MAE ≈ **116.84**
+- Test RMSE ≈ **137.95**
+- Test R-squared ≈ **0.3987**
 
-The reduced MLR clearly improves on the training-mean baseline.
+The future holdout error is not materially worse than the training error, so the chronological comparison does not indicate severe overfitting. This is evidence of generalization to the April-June 2026 holdout period, not proof that performance will remain identical in all future periods.
+
+The reduced MLR lowers test RMSE by approximately **22.65%** relative to the training-mean baseline.
+
+## 8.10 Holdout performance by Export Market
+
+The historical Local/Japan frequencies are unequal. Because **Quantity is the response** and Export Market is a predictor, the appropriate robustness check is to examine holdout performance by market rather than artificially balancing the predictor distribution with SMOTE, oversampling, or undersampling.
+
+```{r market-performance}
+subgroup_prediction_performance = function(
+  data,
+  group_variable,
+  actual,
+  predicted
+) {
+
+  group_values =
+    as.character(
+      data[[group_variable]]
+    )
+
+  group_levels =
+    unique(
+      group_values
+    )
+
+  result =
+    data.frame()
+
+  for(group_value in group_levels) {
+
+    group_index =
+      group_values ==
+      group_value
+
+    group_actual =
+      actual[group_index]
+
+    group_predicted =
+      predicted[group_index]
+
+    result =
+      rbind(
+        result,
+        data.frame(
+          Group = group_value,
+          N = sum(group_index),
+          Test_Share_Percent =
+            sum(group_index) /
+            nrow(data) * 100,
+          Mean_Actual_Quantity =
+            mean(group_actual),
+          Mean_Predicted_Quantity =
+            mean(group_predicted),
+          MAE =
+            mean(
+              abs(
+                group_actual -
+                group_predicted
+              )
+            ),
+          RMSE =
+            sqrt(
+              mean(
+                (
+                  group_actual -
+                  group_predicted
+                )^2
+              )
+            ),
+          stringsAsFactors = FALSE
+        )
+      )
+  }
+
+  rownames(result) = NULL
+
+  return(result)
+}
+
+market_performance =
+  subgroup_prediction_performance(
+    data = test_df,
+    group_variable = "Export Market",
+    actual = test_df$Quantity,
+    predicted = mlr_test_pred
+  )
+
+names(market_performance)[1] =
+  "Export_Market"
+
+market_performance$Export_Market =
+  factor(
+    market_performance$Export_Market,
+    levels = market_levels
+  )
+
+market_performance =
+  market_performance[
+    order(
+      market_performance$Export_Market
+    ),
+  ]
+
+market_performance$Export_Market =
+  as.character(
+    market_performance$Export_Market
+  )
+
+rownames(market_performance) = NULL
+
+kable(
+  market_performance,
+  digits = 4,
+  caption = "Reduced MLR Test Performance by Export Market"
+)
+
+write.csv(
+  market_performance,
+  "08_Model_Results/R/Task5_Final_MLR_Performance_By_Market.csv",
+  row.names = FALSE
+)
+```
+
+**Project result:** Local transactions make up about **90.1%** of the holdout set and have RMSE ≈ **129.82**, while the smaller Japan subgroup makes up about **9.9%** and has RMSE ≈ **197.20**. The Japan subgroup therefore has higher predictive error and should be treated as an important limitation rather than artificially resampled.
+
+## 8.11 Holdout performance by Product
+
+```{r product-performance}
+product_performance =
+  subgroup_prediction_performance(
+    data = test_df,
+    group_variable = "Product Name",
+    actual = test_df$Quantity,
+    predicted = mlr_test_pred
+  )
+
+names(product_performance)[1] =
+  "Product_Name"
+
+product_performance$Product_Name =
+  factor(
+    product_performance$Product_Name,
+    levels = product_levels
+  )
+
+product_performance =
+  product_performance[
+    order(
+      product_performance$Product_Name
+    ),
+  ]
+
+product_performance$Product_Name =
+  as.character(
+    product_performance$Product_Name
+  )
+
+rownames(product_performance) = NULL
+
+kable(
+  product_performance,
+  digits = 4,
+  caption = "Reduced MLR Test Performance by Product"
+)
+
+write.csv(
+  product_performance,
+  "08_Model_Results/R/Task5_Final_MLR_Performance_By_Product.csv",
+  row.names = FALSE
+)
+```
+
+**Project result:** product-level RMSE ranges from approximately **128.43** for Kennedy to **156.91** for Secret Ambrosia. No product shows a catastrophic model failure, although Secret Ambrosia has the highest holdout error among the four perfumes.
 
 # 9. Task 5B - Poisson GLM
 
@@ -920,6 +1341,13 @@ ridge_final = glmnet(
   standardize = TRUE
 )
 
+ridge_train_pred = as.numeric(
+  predict(
+    ridge_final,
+    newx = x_train
+  )
+)
+
 ridge_test_pred = as.numeric(
   predict(
     ridge_final,
@@ -927,12 +1355,19 @@ ridge_test_pred = as.numeric(
   )
 )
 
+ridge_train_metrics =
+  regression_metrics(
+    y_train,
+    ridge_train_pred
+  )
+
 ridge_test_metrics =
   regression_metrics(
     y_test,
     ridge_test_pred
   )
 
+ridge_train_metrics
 ridge_test_metrics
 ```
 
@@ -989,12 +1424,25 @@ lasso_final = glmnet(
   standardize = TRUE
 )
 
+lasso_train_pred = as.numeric(
+  predict(
+    lasso_final,
+    newx = x_train
+  )
+)
+
 lasso_test_pred = as.numeric(
   predict(
     lasso_final,
     newx = x_test
   )
 )
+
+lasso_train_metrics =
+  regression_metrics(
+    y_train,
+    lasso_train_pred
+  )
 
 lasso_test_metrics =
   regression_metrics(
@@ -1019,6 +1467,7 @@ lasso_selected =
   ]
 
 lasso_selected
+lasso_train_metrics
 lasso_test_metrics
 ```
 
@@ -1109,12 +1558,25 @@ elastic_final = glmnet(
   standardize = TRUE
 )
 
+elastic_train_pred = as.numeric(
+  predict(
+    elastic_final,
+    newx = x_train
+  )
+)
+
 elastic_test_pred = as.numeric(
   predict(
     elastic_final,
     newx = x_test
   )
 )
+
+elastic_train_metrics =
+  regression_metrics(
+    y_train,
+    elastic_train_pred
+  )
 
 elastic_test_metrics =
   regression_metrics(
@@ -1139,12 +1601,15 @@ elastic_selected =
   ]
 
 elastic_selected
+elastic_train_metrics
 elastic_test_metrics
 ```
 
 **Project finding:** Elastic Net retains the Japan indicator and a small November effect at the selected penalty level.
 
 # 16. Final Model Comparison
+
+The final comparison reports both training and future-holdout performance. This makes it possible to compare predictive accuracy and inspect whether a model performs much worse on later unseen observations.
 
 ```{r final-comparison}
 model_comparison = data.frame(
@@ -1157,6 +1622,37 @@ model_comparison = data.frame(
     "LASSO Regression",
     "Elastic Net Regression"
   ),
+
+  Train_MAE = c(
+    baseline_train_metrics["MAE"],
+    mlr_train_metrics["MAE"],
+    poisson_train_metrics["MAE"],
+    nb_train_metrics["MAE"],
+    ridge_train_metrics["MAE"],
+    lasso_train_metrics["MAE"],
+    elastic_train_metrics["MAE"]
+  ),
+
+  Train_RMSE = c(
+    baseline_train_metrics["RMSE"],
+    mlr_train_metrics["RMSE"],
+    poisson_train_metrics["RMSE"],
+    nb_train_metrics["RMSE"],
+    ridge_train_metrics["RMSE"],
+    lasso_train_metrics["RMSE"],
+    elastic_train_metrics["RMSE"]
+  ),
+
+  Train_R2 = c(
+    baseline_train_metrics["R2"],
+    mlr_train_metrics["R2"],
+    poisson_train_metrics["R2"],
+    nb_train_metrics["R2"],
+    ridge_train_metrics["R2"],
+    lasso_train_metrics["R2"],
+    elastic_train_metrics["R2"]
+  ),
+
   Test_MAE = c(
     baseline_test_metrics["MAE"],
     mlr_test_metrics["MAE"],
@@ -1166,6 +1662,7 @@ model_comparison = data.frame(
     lasso_test_metrics["MAE"],
     elastic_test_metrics["MAE"]
   ),
+
   Test_RMSE = c(
     baseline_test_metrics["RMSE"],
     mlr_test_metrics["RMSE"],
@@ -1175,6 +1672,7 @@ model_comparison = data.frame(
     lasso_test_metrics["RMSE"],
     elastic_test_metrics["RMSE"]
   ),
+
   Test_R2 = c(
     baseline_test_metrics["R2"],
     mlr_test_metrics["R2"],
@@ -1183,7 +1681,50 @@ model_comparison = data.frame(
     ridge_test_metrics["R2"],
     lasso_test_metrics["R2"],
     elastic_test_metrics["R2"]
-  )
+  ),
+
+  AIC = c(
+    NA,
+    AIC(reduced_mlr),
+    AIC(poisson_model),
+    AIC(nb_model),
+    NA,
+    NA,
+    NA
+  ),
+
+  Adjusted_R2 = c(
+    NA,
+    summary(reduced_mlr)$adj.r.squared,
+    NA,
+    NA,
+    NA,
+    NA,
+    NA
+  ),
+
+  Tuning = c(
+    "None",
+    "Training-only specification comparison",
+    "None",
+    "Poisson overdispersion motivated NB comparison",
+    paste0(
+      "Lambda = ",
+      signif(best_ridge_lambda, 6)
+    ),
+    paste0(
+      "Lambda = ",
+      signif(best_lasso_lambda, 6)
+    ),
+    paste0(
+      "Alpha = ",
+      best_elastic_alpha,
+      "; Lambda = ",
+      signif(best_elastic_lambda, 6)
+    )
+  ),
+
+  stringsAsFactors = FALSE
 )
 
 model_comparison =
@@ -1198,9 +1739,17 @@ rownames(model_comparison) = NULL
 kable(
   model_comparison,
   digits = 4,
-  caption = "Final Holdout Model Comparison"
+  caption = "Final Training and Future-Holdout Model Comparison"
+)
+
+write.csv(
+  model_comparison,
+  "08_Model_Results/R/Task5B_Final_Model_Comparison.csv",
+  row.names = FALSE
 )
 ```
+
+**Project comparison:** the Reduced MLR has the lowest test RMSE at approximately **137.95**. Poisson and Negative Binomial are extremely close at approximately **138.27**, followed by Elastic Net at approximately **138.84**. The training and test errors are also of similar magnitude across the fitted models, so the chronological comparison does not show severe deterioration on the future holdout period.
 
 # 17. Actual vs Predicted - Reduced MLR
 
@@ -1222,36 +1771,51 @@ abline(
 
 # 18. Final Model Interpretation
 
-The **Reduced MLR** has the lowest holdout RMSE in the project comparison:
+The **Reduced MLR** has the lowest future-holdout RMSE in the project comparison:
 
+- Training MAE ≈ **119.47**
+- Training RMSE ≈ **140.80**
 - Test MAE ≈ **116.84**
 - Test RMSE ≈ **137.95**
 - Test R-squared ≈ **0.3987**
+- Test RMSE improvement over the mean baseline ≈ **22.65%**
 
-The Poisson and Negative Binomial models achieve very similar prediction errors, but Poisson suffers from extreme overdispersion. Negative Binomial is therefore a more defensible count-model alternative.
+The chronological train/test comparison does not indicate severe overfitting because performance does not deteriorate substantially on the later April-June 2026 holdout.
 
-The regularized models are useful sensitivity checks, but none produces a lower holdout RMSE than the reduced MLR.
+The residual diagnostics show significant heteroscedasticity and imperfect residual normality, so ordinary OLS standard errors are not used for coefficient inference. HC3 robust standard errors are used instead. The final Durbin-Watson statistic is approximately **2.036** with p ≈ **0.549**, which does not indicate first-order residual autocorrelation under the ordered training records. Maximum individual-dummy VIF is approximately **1.76**, so multicollinearity is low in the reduced specification.
+
+The market robustness analysis shows an important limitation. Local holdout transactions have RMSE ≈ **129.82**, whereas the smaller Japan subgroup has RMSE ≈ **197.20**. This is not treated as an imbalanced-classification problem: Quantity is the response and Export Market is a predictor. The unequal historical market representation is therefore retained, and subgroup performance is reported transparently rather than using SMOTE or random under/oversampling.
+
+The Poisson and Negative Binomial models achieve very similar prediction errors, but Poisson suffers from extreme overdispersion. Negative Binomial is therefore the more defensible count-model alternative. The regularized models provide useful sensitivity checks, but none produces a lower holdout RMSE than the reduced MLR.
 
 The Reduced MLR is retained as the main organizational model because it combines:
 
-- competitive predictive performance;
+- the lowest holdout RMSE among the compared models;
+- similar training and future-holdout error;
 - low multicollinearity after reduction;
 - straightforward implementation;
 - interpretable coefficients;
-- robust HC3 inference for heteroscedasticity.
+- HC3 robust inference for heteroscedasticity.
 
 # 19. Important Limitations
 
 - Historical observational data do not establish causality.
 - Japan transactions are concentrated in one buyer and within the Main Dealer/current-regime structure.
+- The Japan holdout subgroup is much smaller than Local and has higher prediction error.
 - Repeated transactions from the same buyers may violate complete observation-level independence.
+- Durbin-Watson is only an exploratory sequential-residual diagnostic and does not remove the repeated-buyer limitation.
 - The models predict **transaction-level Quantity**, not total monthly demand.
 - The April-June 2026 holdout is one future evaluation period and does not guarantee identical future performance.
+- Residual heteroscedasticity remains present; HC3 improves coefficient inference but does not remove heteroscedasticity from the data.
+- Residual normality is imperfect.
 - The MLR predictions shrink toward the middle and do not reproduce the full range of extreme orders.
+- Product-level holdout error is not identical; Secret Ambrosia has the highest product RMSE in this holdout period.
 - Regularized coefficients are affected by shrinkage and should not be interpreted like ordinary unpenalized regression coefficients.
 
 # 20. Task 5 Conclusion
 
-The modelling exercise shows that demand is predictable to a useful but limited degree from the available transaction characteristics. The strongest predictive signal is associated with the export-market structure, especially Japan-labelled transactions, but this association is confounded with buyer structure and must be interpreted cautiously.
+The modelling exercise shows that transaction-level Regular Order Quantity is predictable to a useful but limited degree from the available transaction characteristics. The strongest predictive signal is associated with the export-market structure, especially Japan-labelled transactions, but this association is confounded with buyer structure and must be interpreted cautiously.
 
-The final model comparison supports retaining the **Reduced Multiple Linear Regression** as the primary predictive model, with **Negative Binomial regression** as the main alternative distributional model.
+The final model comparison supports retaining the **Reduced Multiple Linear Regression** as the primary predictive model because it has the lowest future-holdout RMSE and remains straightforward to interpret and implement. **Negative Binomial regression** is retained as the main count-model alternative because it addresses the severe overdispersion that invalidates the ordinary Poisson variance assumption.
+
+The added market- and product-level holdout checks make the model evaluation more transparent: overall performance is useful, but predictive reliability is weaker for the smaller Japan subgroup and somewhat weaker for Secret Ambrosia. These limitations should be communicated when the model is used in the Fragceylon decision-support dashboard.

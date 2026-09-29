@@ -2,7 +2,6 @@
 # IT3081 - Statistical Modelling
 # Fragceylon Retail Product Demand Analysis
 # TASK 5B - Alternative Predictive Models and Final Model Comparison
-# LAB-SHEET STYLE FINAL R VERSION
 #
 # This file continues Task 5A.
 # It investigates the additional models planned for the project:
@@ -1773,3 +1772,4 @@ cat("Elastic Net best lambda:", signif(best_elastic_lambda, 6), "\n")
 cat("Lowest holdout RMSE model:", best_test_model, "\n")
 cat("Lowest holdout RMSE:", round(best_test_rmse, 4), "\n")
 cat("Task 5B alternative predictive modelling completed successfully.\n")
+

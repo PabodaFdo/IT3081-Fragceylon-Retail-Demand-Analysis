@@ -2,8 +2,7 @@
 # IT3081 - Statistical Modelling
 # Fragceylon Retail Product Demand Analysis
 # TASK 5 - Predictive Statistical Modelling
-# LAB-SHEET STYLE FINAL R VERSION
-#
+
 # This R version follows the completed Task5_Predictive_Modelling.ipynb.
 # It uses the cleaned Regular Orders dataset created in Task 3A.
 #
@@ -1159,12 +1158,48 @@ final_jb_p = pchisq(
 
 bp_final = bptest(final_mlr)
 
+# Durbin-Watson is used here as an exploratory sequential-residual diagnostic.
+# A two-sided alternative checks for either positive or negative autocorrelation.
+# It does not, by itself, rule out dependence created by repeated buyers.
+dw_final = dwtest(
+  final_mlr,
+  alternative = "two.sided"
+)
+
 cat("\nFINAL MLR RESIDUAL DIAGNOSTICS\n")
 cat("Jarque-Bera statistic:", final_jb_stat, "\n")
 cat("Jarque-Bera p-value:", final_jb_p, "\n")
 cat("Skewness:", final_jb_skew, "\n")
 cat("Kurtosis:", final_jb_kurt, "\n")
 print(bp_final)
+print(dw_final)
+
+final_diagnostics_table = data.frame(
+  Diagnostic = c(
+    "Jarque-Bera normality test",
+    "Breusch-Pagan heteroscedasticity test",
+    "Durbin-Watson residual autocorrelation test"
+  ),
+  Statistic = c(
+    final_jb_stat,
+    unname(bp_final$statistic),
+    unname(dw_final$statistic)
+  ),
+  p_value = c(
+    final_jb_p,
+    bp_final$p.value,
+    dw_final$p.value
+  ),
+  stringsAsFactors = FALSE
+)
+
+print(final_diagnostics_table)
+
+write.csv(
+  final_diagnostics_table,
+  "08_Model_Results/R/Task5_Final_MLR_Diagnostics.csv",
+  row.names = FALSE
+)
 
 
 # ----------------------------------------------------------------------------
@@ -1295,6 +1330,164 @@ print(head(prediction_output))
 write.csv(
   prediction_output,
   "08_Model_Results/R/Task5_Final_Test_Predictions.csv",
+  row.names = FALSE
+)
+
+
+# ----------------------------------------------------------------------------
+# Step 30A: Final Holdout Performance by Market
+# ----------------------------------------------------------------------------
+# This subgroup analysis is a robustness check for the unequal Local/Japan
+# representation in the historical data.
+#
+# Export Market is a predictor, not the response class. Therefore the purpose
+# here is to inspect predictive reliability by market, not to artificially
+# balance the historical observations with SMOTE, oversampling or undersampling.
+
+subgroup_prediction_performance = function(
+  data,
+  group_variable,
+  actual,
+  predicted
+) {
+
+  group_values = as.character(
+    data[[group_variable]]
+  )
+
+  group_levels = unique(group_values)
+
+  result = data.frame()
+
+  for(group_value in group_levels) {
+
+    group_index =
+      group_values == group_value
+
+    group_actual =
+      actual[group_index]
+
+    group_predicted =
+      predicted[group_index]
+
+    group_mae =
+      mean(
+        abs(
+          group_actual - group_predicted
+        )
+      )
+
+    group_rmse =
+      sqrt(
+        mean(
+          (group_actual - group_predicted)^2
+        )
+      )
+
+    result = rbind(
+      result,
+      data.frame(
+        Group = group_value,
+        N = sum(group_index),
+        Test_Share_Percent =
+          sum(group_index) / nrow(data) * 100,
+        Mean_Actual_Quantity =
+          mean(group_actual),
+        Mean_Predicted_Quantity =
+          mean(group_predicted),
+        MAE = group_mae,
+        RMSE = group_rmse,
+        stringsAsFactors = FALSE
+      )
+    )
+  }
+
+  rownames(result) = NULL
+
+  return(result)
+}
+
+
+market_performance =
+  subgroup_prediction_performance(
+    data = final_test,
+    group_variable = "Export Market",
+    actual = final_test$Quantity,
+    predicted = final_test_pred
+  )
+
+names(market_performance)[1] =
+  "Export_Market"
+
+market_performance$Export_Market =
+  factor(
+    market_performance$Export_Market,
+    levels = market_levels
+  )
+
+market_performance =
+  market_performance[
+    order(market_performance$Export_Market),
+  ]
+
+market_performance$Export_Market =
+  as.character(
+    market_performance$Export_Market
+  )
+
+rownames(market_performance) = NULL
+
+cat("\nFINAL MLR TEST PERFORMANCE BY MARKET\n")
+print(market_performance)
+
+write.csv(
+  market_performance,
+  "08_Model_Results/R/Task5_Final_MLR_Performance_By_Market.csv",
+  row.names = FALSE
+)
+
+
+# ----------------------------------------------------------------------------
+# Step 30B: Final Holdout Performance by Product
+# ----------------------------------------------------------------------------
+# Product-level holdout metrics check whether the selected model's aggregate
+# performance hides substantially different prediction error across perfumes.
+
+product_performance =
+  subgroup_prediction_performance(
+    data = final_test,
+    group_variable = "Product Name",
+    actual = final_test$Quantity,
+    predicted = final_test_pred
+  )
+
+names(product_performance)[1] =
+  "Product_Name"
+
+product_performance$Product_Name =
+  factor(
+    product_performance$Product_Name,
+    levels = product_levels
+  )
+
+product_performance =
+  product_performance[
+    order(product_performance$Product_Name),
+  ]
+
+product_performance$Product_Name =
+  as.character(
+    product_performance$Product_Name
+  )
+
+rownames(product_performance) = NULL
+
+cat("\nFINAL MLR TEST PERFORMANCE BY PRODUCT\n")
+print(product_performance)
+
+write.csv(
+  product_performance,
+  "08_Model_Results/R/Task5_Final_MLR_Performance_By_Product.csv",
   row.names = FALSE
 )
 
@@ -1433,6 +1626,33 @@ cat("Test R-squared:", round(final_test_metrics["R2"], 4), "\n")
 cat("Test MAE improvement over baseline:", round(final_mae_improvement, 2), "%\n")
 cat("Test RMSE improvement over baseline:", round(final_rmse_improvement, 2), "%\n\n")
 
+cat("GENERALIZATION / OVERFITTING CHECK\n")
+cat("Training MAE:", round(final_train_metrics["MAE"], 4), "\n")
+cat("Testing MAE:", round(final_test_metrics["MAE"], 4), "\n")
+cat("Training RMSE:", round(final_train_metrics["RMSE"], 4), "\n")
+cat("Testing RMSE:", round(final_test_metrics["RMSE"], 4), "\n")
+cat(
+  "Interpretation: chronological training and future-holdout errors are compared to assess generalization; this comparison does not by itself prove complete absence of overfitting.\n\n"
+)
+
+cat("HOLDOUT PERFORMANCE BY MARKET\n")
+print(market_performance)
+cat(
+  "Interpretation: these subgroup metrics are used to assess whether overall model performance hides materially different error across Local and Japan transactions. The Japan subgroup is smaller, so its metrics should be interpreted with its sample size.\n\n"
+)
+
+cat("HOLDOUT PERFORMANCE BY PRODUCT\n")
+print(product_performance)
+cat(
+  "Interpretation: product-level holdout metrics assess whether aggregate predictive performance is broadly consistent across the four perfumes.\n\n"
+)
+
+cat("FINAL MODEL DIAGNOSTICS\n")
+print(final_diagnostics_table)
+cat(
+  "Durbin-Watson is treated as an exploratory sequential-residual diagnostic; repeated buyer activity remains a separate independence limitation.\n\n"
+)
+
 cat("ROBUST INFERENCE\n")
 cat(
   "HC3 heteroscedasticity-robust standard errors were used for coefficient uncertainty because the Breusch-Pagan diagnostic indicated unequal residual variance.\n"
@@ -1502,7 +1722,23 @@ stopifnot(
   abs(final_test_metrics["R2"] - 0.3987) < 0.001,
   abs(final_mae_improvement - 14.75) < 0.05,
   abs(final_rmse_improvement - 22.65) < 0.05,
-  sum(final_test_pred < 0) == 0
+  sum(final_test_pred < 0) == 0,
+
+  # Final diagnostics
+  is.finite(unname(bp_final$statistic)),
+  is.finite(bp_final$p.value),
+  is.finite(unname(dw_final$statistic)),
+  is.finite(dw_final$p.value),
+
+  # Holdout subgroup robustness
+  nrow(market_performance) == 2,
+  sum(market_performance$N) == nrow(final_test),
+  all(is.finite(market_performance$MAE)),
+  all(is.finite(market_performance$RMSE)),
+  nrow(product_performance) == 4,
+  sum(product_performance$N) == nrow(final_test),
+  all(is.finite(product_performance$MAE)),
+  all(is.finite(product_performance$RMSE))
 )
 
 print("All Task 5 validation checks passed.")
@@ -1579,3 +1815,4 @@ cat(
 )
 
 cat("Task 5 predictive modelling completed successfully.\n")
+
