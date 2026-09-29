@@ -2,7 +2,7 @@
 # IT3081 - Statistical Modelling
 # Retail Product Demand Analysis at Fragceylon
 # TASK 10 - INDUSTRY INNOVATION PROPOSAL
-# R SHINY DEMAND & INVENTORY DECISION SUPPORT DASHBOARD
+# R SHINY DEMAND MONITORING & DECISION SUPPORT DASHBOARD
 # ============================================================
 #
 # PURPOSE
@@ -82,8 +82,53 @@ library(scales)
 # 2. PROJECT PATHS
 # ============================================================
 
+find_project_root = function(
+  start_path = getwd()
+) {
+
+  current_path =
+    normalizePath(
+      start_path,
+      winslash = "/",
+      mustWork = FALSE
+    )
+
+  for(i in 1:10) {
+
+    candidate_file =
+      file.path(
+        current_path,
+        "04_Cleaned_Data",
+        "Fragceylon_Regular_Orders.xlsx"
+      )
+
+    if(file.exists(candidate_file)) {
+      return(current_path)
+    }
+
+    parent_path =
+      dirname(
+        current_path
+      )
+
+    if(parent_path == current_path) {
+      break
+    }
+
+    current_path =
+      parent_path
+  }
+
+  stop(
+    paste0(
+      "Project root could not be found. ",
+      "Open the Fragceylon project folder in RStudio and run the app again."
+    )
+  )
+}
+
 project_root =
-  "C:/Users/saths/Desktop/Sliit/3rd year/3rd Year 1st sem/IT3081-SM/Project/IT3081-Fragceylon-Retail-Demand-Analysis"
+  find_project_root()
 
 regular_file =
   file.path(
@@ -233,6 +278,165 @@ reduced_mlr =
       model_train
   )
 
+model_test =
+  current_regime %>%
+  filter(
+    Date >=
+      TEST_START_DATE
+  )
+
+model_test$Product_Name =
+  factor(
+    model_test$Product_Name,
+    levels = product_levels
+  )
+
+model_test$Export_Market =
+  factor(
+    model_test$Export_Market,
+    levels = market_levels
+  )
+
+model_test$Day =
+  factor(
+    model_test$Day,
+    levels = day_levels
+  )
+
+regression_metrics = function(
+  actual,
+  predicted
+) {
+
+  mae =
+    mean(
+      abs(
+        actual - predicted
+      )
+    )
+
+  rmse =
+    sqrt(
+      mean(
+        (
+          actual - predicted
+        )^2
+      )
+    )
+
+  r2 =
+    1 -
+    sum(
+      (
+        actual - predicted
+      )^2
+    ) /
+    sum(
+      (
+        actual - mean(actual)
+      )^2
+    )
+
+  c(
+    MAE = mae,
+    RMSE = rmse,
+    R2 = r2
+  )
+}
+
+model_train_prediction =
+  predict(
+    reduced_mlr,
+    newdata = model_train
+  )
+
+model_test_prediction =
+  predict(
+    reduced_mlr,
+    newdata = model_test
+  )
+
+model_train_metrics =
+  regression_metrics(
+    model_train$Quantity,
+    model_train_prediction
+  )
+
+model_test_metrics =
+  regression_metrics(
+    model_test$Quantity,
+    model_test_prediction
+  )
+
+baseline_value =
+  mean(
+    model_train$Quantity
+  )
+
+baseline_test_prediction =
+  rep(
+    baseline_value,
+    nrow(model_test)
+  )
+
+baseline_test_metrics =
+  regression_metrics(
+    model_test$Quantity,
+    baseline_test_prediction
+  )
+
+rmse_improvement_percent =
+  (
+    baseline_test_metrics["RMSE"] -
+    model_test_metrics["RMSE"]
+  ) /
+  baseline_test_metrics["RMSE"] *
+  100
+
+market_holdout_performance =
+  data.frame(
+    Export_Market =
+      market_levels,
+    N = NA_integer_,
+    MAE = NA_real_,
+    RMSE = NA_real_,
+    stringsAsFactors = FALSE
+  )
+
+for(i in seq_along(market_levels)) {
+
+  market_value =
+    market_levels[i]
+
+  market_index =
+    as.character(
+      model_test$Export_Market
+    ) == market_value
+
+  market_holdout_performance$N[i] =
+    sum(
+      market_index
+    )
+
+  market_holdout_performance$MAE[i] =
+    mean(
+      abs(
+        model_test$Quantity[market_index] -
+        model_test_prediction[market_index]
+      )
+    )
+
+  market_holdout_performance$RMSE[i] =
+    sqrt(
+      mean(
+        (
+          model_test$Quantity[market_index] -
+          model_test_prediction[market_index]
+        )^2
+      )
+    )
+}
+
 
 # ============================================================
 # 5. PRE-COMPUTED MANAGEMENT SUMMARIES
@@ -261,6 +465,17 @@ current_total_demand =
     current_regime$Quantity,
     na.rm = TRUE
   )
+
+overall_regular_orders =
+  nrow(
+    regular_orders
+  )
+
+HIGH_DEMAND_RATIO =
+  1.20
+
+LOW_DEMAND_RATIO =
+  0.80
 
 product_summary =
   regular_orders %>%
@@ -390,13 +605,13 @@ current_monthly =
 # Recent period = latest 3 months in the current regime.
 # Historical comparison = all earlier months in current regime.
 #
-# High-demand alert:
+# Above-reference indicator:
 #   Recent monthly average > 120% of historical monthly average
 #
-# Slow-moving alert:
+# Below-reference indicator:
 #   Recent monthly average < 80% of historical monthly average
 #
-# Stable / normal:
+# Within-reference indicator:
 #   Between 80% and 120%
 #
 # The thresholds are transparent management indicators only.
@@ -483,12 +698,12 @@ decision_support =
           is.na(ratio),
           "Insufficient History",
           ifelse(
-            ratio > 1.20,
-            "High-Demand Alert",
+            ratio > HIGH_DEMAND_RATIO,
+            "Above Reference Range",
             ifelse(
-              ratio < 0.80,
-              "Slow-Moving Alert",
-              "Within Historical Range"
+              ratio < LOW_DEMAND_RATIO,
+              "Below Reference Range",
+              "Within Reference Range"
             )
           )
         )
@@ -522,7 +737,7 @@ ui =
 
     dashboardHeader(
       title =
-        "Fragceylon Demand Dashboard",
+        "Fragceylon Demand Monitoring",
       titleWidth = 300
     ),
 
@@ -533,7 +748,7 @@ ui =
         id = "tabs",
 
         menuItem(
-          "Executive Overview",
+          "Overview",
           tabName = "overview",
           icon = icon("chart-line")
         ),
@@ -545,31 +760,31 @@ ui =
         ),
 
         menuItem(
-          "Seasonal Analysis",
+          "Monthly Demand",
           tabName = "seasonal",
           icon = icon("calendar")
         ),
 
         menuItem(
-          "Channel & Market",
+          "Market & Channel",
           tabName = "channel_market",
           icon = icon("store")
         ),
 
         menuItem(
-          "Predictive Insights",
+          "Prediction",
           tabName = "predictive",
           icon = icon("calculator")
         ),
 
         menuItem(
-          "Decision Support",
+          "Demand Monitoring",
           tabName = "decision",
           icon = icon("lightbulb")
         ),
 
         menuItem(
-          "About & Limitations",
+          "Data & Model Notes",
           tabName = "about",
           icon = icon("circle-info")
         )
@@ -587,11 +802,11 @@ ui =
             }
 
             .box {
-              border-radius: 8px;
+              border-radius: 4px;
             }
 
             .small-box {
-              border-radius: 8px;
+              border-radius: 4px;
             }
 
             .dashboard-note {
@@ -642,7 +857,7 @@ ui =
               width = 3
             ),
             valueBoxOutput(
-              "currentRegimeBox",
+              "regularOrderBox",
               width = 3
             )
           ),
@@ -676,32 +891,23 @@ ui =
           fluidRow(
             box(
               title =
-                "Management Summary",
+                "Management Notes",
               status = "info",
               solidHeader = TRUE,
               width = 12,
 
-              div(
-                class = "dashboard-note",
-                tags$b(
-                  "Current analytical position:"
-                ),
-                tags$br(),
-                "The dashboard summarizes historical demand and the validated statistical analysis. "
-              ),
-
               tags$ul(
                 tags$li(
-                  "Reduced MLR remains the primary interpretable predictive model."
+                  "Use the dashboard as a weekly review of Regular Order demand."
                 ),
                 tags$li(
-                  "Japan market is strongly associated with higher order quantity in the historical model, but this should not be interpreted causally."
+                  "The selected model predicts transaction-level order quantity, not monthly total demand."
                 ),
                 tags$li(
-                  "Current time-series history is too short for dependable production ARIMA/SARIMA forecasting."
+                  "Market and channel patterns are historical associations and should not be interpreted as causal effects."
                 ),
                 tags$li(
-                  "Decision-support alerts are monitoring indicators only and are not exact stock-reorder instructions."
+                  "Demand-monitoring thresholds are prototype rules for management review, not automatic reorder quantities."
                 )
               )
             )
@@ -797,7 +1003,7 @@ ui =
           fluidRow(
             box(
               title =
-                "Current-Regime Monthly Demand",
+                "Monthly Demand - Current Business Regime",
               status = "primary",
               solidHeader = TRUE,
               width = 8,
@@ -810,7 +1016,7 @@ ui =
 
             box(
               title =
-                "Time-Series Readiness",
+                "Time-Series Note",
               status = "warning",
               solidHeader = TRUE,
               width = 4,
@@ -841,7 +1047,7 @@ ui =
           fluidRow(
             box(
               title =
-                "Month-of-Year Demand",
+                "Month-of-Year View",
               status = "info",
               solidHeader = TRUE,
               width = 12,
@@ -865,7 +1071,7 @@ ui =
           fluidRow(
             box(
               title =
-                "Demand by Channel",
+                "Historical Demand by Channel",
               status = "primary",
               solidHeader = TRUE,
               width = 6,
@@ -878,7 +1084,7 @@ ui =
 
             box(
               title =
-                "Demand by Market",
+                "Historical Demand by Market",
               status = "primary",
               solidHeader = TRUE,
               width = 6,
@@ -893,7 +1099,7 @@ ui =
           fluidRow(
             box(
               title =
-                "Channel Summary",
+                "Historical Channel Summary",
               status = "info",
               solidHeader = TRUE,
               width = 6,
@@ -905,7 +1111,7 @@ ui =
 
             box(
               title =
-                "Market Summary",
+                "Historical Market Summary",
               status = "info",
               solidHeader = TRUE,
               width = 6,
@@ -993,7 +1199,7 @@ ui =
 
             box(
               title =
-                "Predicted Order Quantity",
+                "Expected Order Quantity",
               status = "success",
               solidHeader = TRUE,
               width = 4,
@@ -1004,34 +1210,30 @@ ui =
                 )
               ),
 
+              tags$b(
+                "95% prediction interval"
+              ),
+
               p(
-                "This is a model-based expected order quantity, not a guaranteed future sale."
+                textOutput(
+                  "predictionInterval"
+                )
+              ),
+
+              p(
+                "This is a model estimate for one future transaction, not a guaranteed sale."
               )
             ),
 
             box(
               title =
-                "Model Context",
+                "Model Summary",
               status = "info",
               solidHeader = TRUE,
               width = 4,
 
-              tags$ul(
-                tags$li(
-                  "Model: Reduced Multiple Linear Regression"
-                ),
-                tags$li(
-                  "Training period: 2025-04-01 to 2026-03-31"
-                ),
-                tags$li(
-                  "Test RMSE: approximately 137.95 units"
-                ),
-                tags$li(
-                  "Test R-squared: approximately 0.399"
-                ),
-                tags$li(
-                  "Predictors: Product, Export Market, Day of Week"
-                )
+              uiOutput(
+                "modelContext"
               )
             )
           ),
@@ -1039,16 +1241,36 @@ ui =
           fluidRow(
             box(
               title =
-                "Interpretation",
+                "Holdout Performance by Market",
+              status = "info",
+              solidHeader = TRUE,
+              width = 6,
+
+              DTOutput(
+                "marketHoldoutTable"
+              )
+            ),
+
+            box(
+              title =
+                "Prediction Limits",
               status = "warning",
               solidHeader = TRUE,
-              width = 12,
+              width = 6,
 
-              div(
-                class = "warning-note",
-                "Predictions should support managerial judgment rather than replace it. "
-                ,
-                "The current model does not include complete inventory, promotion, stock-out, supplier lead-time or marketing data."
+              tags$ul(
+                tags$li(
+                  "The model predicts transaction-level Quantity only."
+                ),
+                tags$li(
+                  "The Japan holdout subgroup is smaller and has higher prediction error."
+                ),
+                tags$li(
+                  "Inventory, promotion, stock-out, supplier lead-time and marketing variables are not available."
+                ),
+                tags$li(
+                  "Predictions should support management review rather than replace judgment."
+                )
               )
             )
           )
@@ -1056,7 +1278,7 @@ ui =
 
 
         # ====================================================
-        # DECISION SUPPORT
+        # DEMAND MONITORING
         # ====================================================
 
         tabItem(
@@ -1065,7 +1287,7 @@ ui =
           fluidRow(
             box(
               title =
-                "Demand Monitoring Indicators",
+                "Product Monitoring Status",
               status = "primary",
               solidHeader = TRUE,
               width = 12,
@@ -1079,7 +1301,7 @@ ui =
           fluidRow(
             box(
               title =
-                "How Indicators Are Calculated",
+                "Monitoring Rule",
               status = "info",
               solidHeader = TRUE,
               width = 6,
@@ -1092,20 +1314,20 @@ ui =
                   "Historical comparison = earlier months within the current Main Dealer regime."
                 ),
                 tags$li(
-                  "High-Demand Alert = recent average > 120% of earlier average."
+                  "Above Reference Range = recent average > 120% of earlier average."
                 ),
                 tags$li(
-                  "Slow-Moving Alert = recent average < 80% of earlier average."
+                  "Below Reference Range = recent average < 80% of earlier average."
                 ),
                 tags$li(
-                  "Otherwise = Within Historical Range."
+                  "Otherwise = Within Reference Range."
                 )
               )
             ),
 
             box(
               title =
-                "Important Use Restriction",
+                "Use Restriction",
               status = "warning",
               solidHeader = TRUE,
               width = 6,
@@ -1116,7 +1338,7 @@ ui =
                   "Do not use these indicators as automatic reorder quantities."
                 ),
                 tags$br(),
-                "They are monitoring signals designed to direct management attention. "
+                "They are prototype monitoring rules designed to direct management attention. "
                 ,
                 "Exact replenishment decisions require inventory on hand, stock-out history, supplier lead time, order costs and service-level targets."
               )
@@ -1135,17 +1357,17 @@ ui =
           fluidRow(
             box(
               title =
-                "Innovation Concept",
+                "What This Dashboard Does",
               status = "primary",
               solidHeader = TRUE,
               width = 12,
 
               h4(
-                "Fragceylon R Shiny Demand & Inventory Decision Support Dashboard"
+                "Fragceylon Demand Monitoring & Decision Support Dashboard"
               ),
 
               p(
-                "The dashboard converts statistical analysis into a reusable management interface so that decision-makers can explore historical demand, compare products, review market/channel patterns, obtain model-based demand estimates and monitor potential demand changes."
+                "The dashboard brings the project results into one place for weekly review of product demand, market/channel patterns, model-based order estimates and unusual recent demand changes."
               )
             )
           ),
@@ -1153,7 +1375,7 @@ ui =
           fluidRow(
             box(
               title =
-                "Conceptual Framework",
+                "Data Flow",
               status = "info",
               solidHeader = TRUE,
               width = 6,
@@ -1181,7 +1403,7 @@ New Data / Feedback
 
             box(
               title =
-                "Current Limitations",
+                "Current Data Limits",
               status = "warning",
               solidHeader = TRUE,
               width = 6,
@@ -1218,7 +1440,7 @@ New Data / Feedback
           fluidRow(
             box(
               title =
-                "Future Data Needed",
+                "Future Data to Collect",
               status = "success",
               solidHeader = TRUE,
               width = 12,
@@ -1335,18 +1557,18 @@ server =
         )
       })
 
-    output$currentRegimeBox =
+    output$regularOrderBox =
       renderValueBox({
         valueBox(
           value =
             comma(
-              current_total_demand
+              overall_regular_orders
             ),
           subtitle =
-            "Demand Since 1 Apr 2025",
+            "Regular Orders",
           icon =
             icon(
-              "chart-line"
+              "receipt"
             ),
           color =
             "purple"
@@ -1805,8 +2027,89 @@ server =
 
 
     # --------------------------------------------------------
-    # PREDICTIVE INSIGHTS
+    # PREDICTION
     # --------------------------------------------------------
+
+    output$modelContext =
+      renderUI({
+
+        tags$ul(
+          tags$li(
+            "Model: Reduced Multiple Linear Regression"
+          ),
+          tags$li(
+            "Predictors: Product, Export Market, Day of Week"
+          ),
+          tags$li(
+            paste0(
+              "Training RMSE: ",
+              round(
+                model_train_metrics["RMSE"],
+                2
+              ),
+              " units"
+            )
+          ),
+          tags$li(
+            paste0(
+              "Test RMSE: ",
+              round(
+                model_test_metrics["RMSE"],
+                2
+              ),
+              " units"
+            )
+          ),
+          tags$li(
+            paste0(
+              "Test R-squared: ",
+              round(
+                model_test_metrics["R2"],
+                3
+              )
+            )
+          ),
+          tags$li(
+            paste0(
+              "RMSE improvement over mean baseline: ",
+              round(
+                rmse_improvement_percent,
+                2
+              ),
+              "%"
+            )
+          )
+        )
+      })
+
+    output$marketHoldoutTable =
+      renderDT({
+
+        display_data =
+          market_holdout_performance %>%
+          mutate(
+            MAE =
+              round(
+                MAE,
+                2
+              ),
+            RMSE =
+              round(
+                RMSE,
+                2
+              )
+          )
+
+        datatable(
+          display_data,
+          rownames = FALSE,
+          options =
+            list(
+              dom = "t",
+              pageLength = 5
+            )
+        )
+      })
 
     prediction_result =
       eventReactive(
@@ -1870,9 +2173,35 @@ server =
         )
       })
 
+    output$predictionInterval =
+      renderText({
+
+        prediction =
+          prediction_result()
+
+        paste0(
+          round(
+            prediction[
+              1,
+              "lwr"
+            ],
+            1
+          ),
+          " to ",
+          round(
+            prediction[
+              1,
+              "upr"
+            ],
+            1
+          ),
+          " units"
+        )
+      })
+
 
     # --------------------------------------------------------
-    # DECISION SUPPORT
+    # DEMAND MONITORING
     # --------------------------------------------------------
 
     output$decisionTable =
@@ -1892,10 +2221,23 @@ server =
                 1
               ),
             Recent_to_Historical_Ratio =
-              round(
-                Recent_to_Historical_Ratio,
-                3
+              paste0(
+                round(
+                  Recent_to_Historical_Ratio *
+                  100,
+                  1
+                ),
+                "%"
               )
+          )
+
+        names(display_data) =
+          c(
+            "Product",
+            "Recent 3-Month Avg",
+            "Earlier Regime Avg",
+            "Recent / Earlier",
+            "Monitoring Status"
           )
 
         datatable(
