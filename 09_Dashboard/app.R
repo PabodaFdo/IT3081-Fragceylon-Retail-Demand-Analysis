@@ -1211,12 +1211,20 @@ ui =
               ),
 
               tags$b(
-                "95% prediction interval"
+                "95% model-based prediction interval (nonnegative display)"
               ),
 
               p(
                 textOutput(
                   "predictionInterval"
+                )
+              ),
+
+              p(
+                tags$small(
+                  textOutput(
+                    "predictionIntervalNote"
+                  )
                 )
               ),
 
@@ -2173,30 +2181,59 @@ server =
         )
       })
 
+    # Only the displayed range is bounded below by zero.
+    # The original model prediction interval remains unchanged.
     output$predictionInterval =
       renderText({
 
         prediction =
           prediction_result()
 
+        displayed_lower =
+          pmax(
+            0,
+            prediction[1, "lwr"]
+          )
+
+        displayed_upper =
+          pmax(
+            0,
+            prediction[1, "upr"]
+          )
+
         paste0(
-          round(
-            prediction[
-              1,
-              "lwr"
-            ],
-            1
-          ),
+          sprintf("%.1f", displayed_lower),
           " to ",
-          round(
-            prediction[
-              1,
-              "upr"
-            ],
-            1
-          ),
+          sprintf("%.1f", displayed_upper),
           " units"
         )
+      })
+
+    output$predictionIntervalNote =
+      renderText({
+
+        prediction =
+          prediction_result()
+
+        original_lower =
+          as.numeric(prediction[1, "lwr"])
+
+        original_upper =
+          as.numeric(prediction[1, "upr"])
+
+        if(original_lower < 0 || original_upper < 0) {
+          paste0(
+            "Original unmodified interval: ",
+            sprintf("%.1f", original_lower),
+            " to ",
+            sprintf("%.1f", original_upper),
+            " units. Negative bounds are displayed as zero because ",
+            "order quantities cannot be negative. This is a ",
+            "display adjustment, not a recalibrated statistical interval."
+          )
+        } else {
+          "This model-based interval describes uncertainty for one future transaction; its reliability depends on the regression assumptions."
+        }
       })
 
 
